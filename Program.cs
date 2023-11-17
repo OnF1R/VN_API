@@ -15,6 +15,8 @@ namespace VN_API
             // Add services to the container.
             builder.Services.AddTransient<INovelService, NovelAdderService>();
 
+            builder.Services.AddCors();
+
             builder.Services.AddControllers()
                 .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
@@ -38,8 +40,14 @@ namespace VN_API
 
             app.UseHttpsRedirection();
 
-            app.UseAuthorization();
+            app.UseCors(builder =>
+            {
+                builder.AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+            });
 
+            app.UseAuthorization();
 
             app.MapControllers();
 
