@@ -13,7 +13,7 @@
         //public int PageViewesCount { get; set; }
         //public int CommentsCount { get; set; }
 
-        public List<GamingPlatform> Platforms { get; set; }
+        public virtual List<GamingPlatform> Platforms { get; set; }
 
         public ReadingTime ReadingTime { get; set; }
 
@@ -22,10 +22,10 @@
         //public Autor Autor { get; set; }
         public string Autor { get; set; }
 
-        public List<Genre> Genres { get; set; }
-        public List<Tag> Tags { get; set; }
+        public virtual List<Genre> Genres { get; set; }
+        public virtual List<Tag> Tags { get; set; }
 
-        public List<Language> Languages { get; set; }
+        public virtual List<Language> Languages { get; set; }
 
         public int ReleaseYear { get; set; }
 

@@ -15,5 +15,11 @@ namespace VN_API.Database
         {
             Database.EnsureCreated();
         }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            optionsBuilder.UseSqlite("Data Source=vn.db");
+            optionsBuilder.UseLazyLoadingProxies();
+        }
     }
 }

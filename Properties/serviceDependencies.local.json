@@ -1,11 +1,10 @@
 {
   "dependencies": {
-    "mssql1": {
-      "serviceConnectorResourceId": "",
+    "sqlite1": {
       "secretStore": "LocalSecretsFile",
-      "resourceId": null,
-      "type": "mssql.local",
-      "connectionId": "ConnectionStrings:DefaultConnection"
+      "type": "sqlite.local",
+      "connectionId": "ConnectionStrings:DefaultConnection",
+      "dynamicId": null
     }
   }
 }
