@@ -42,31 +42,31 @@ namespace VN_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Genre>> AddGenre(Genre genre)
+        public async Task<ActionResult<Genre>> AddGenre([FromQuery] string genreName)
         {
-            var dbGenre = await _novelService.AddGenreAsync(genre);
+            var dbGenre = await _novelService.AddGenreAsync(genreName);
 
             if (dbGenre == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{genre.Name} could not be added.");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{genreName} could not be added.");
             }
 
-            return CreatedAtAction("GetGenre", new { id = genre.Id }, genre);
+            return CreatedAtAction("GetGenre", new { id = dbGenre.Id }, dbGenre);
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateGenre(Guid id, Genre genre)
+        public async Task<IActionResult> UpdateGenre([FromQuery] Guid id, [FromQuery] string genreName)
         {
-            if (id != genre.Id)
+            Genre dbGamingPlatform = await _novelService.UpdateGenreAsync(id, genreName);
+
+            if (dbGamingPlatform == null)
             {
-                return BadRequest();
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{genreName} could not be updated");
             }
 
-            Genre dbGenre = await _novelService.UpdateGenreAsync(genre);
-
-            if (dbGenre == null)
+            if (id != dbGamingPlatform.Id)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{genre.Name} could not be updated");
+                return BadRequest();
             }
 
             return NoContent();

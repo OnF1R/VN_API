@@ -19,37 +19,37 @@ namespace VN_API.Services.Interfaces
         // Gaming platform Service 
         Task<List<GamingPlatform>> GetGamingPlatformsAsync();
         Task<GamingPlatform> GetGamingPlatformAsync(Guid id);
-        Task<GamingPlatform> AddGamingPlatformAsync(GamingPlatform gamingPlatform);
-        Task<VisualNovel> AddVisualNovelToGamingPlatformAsync(Guid gamingPlatformId, Guid vnId);
-        Task<VisualNovel> DeleteVisualNovelToGamingPlatformAsync(Guid gamingPlatformId, Guid vnId);
-        Task<GamingPlatform> UpdateGamingPlatformAsync(GamingPlatform gamingPlatform);
+        Task<GamingPlatform> AddGamingPlatformAsync(string gamingPlatformName);
+        void AddVisualNovelToGamingPlatformAsync(Guid gamingPlatformId, Guid vnId);
+        void DeleteVisualNovelToGamingPlatformAsync(Guid gamingPlatformId, Guid vnId);
+        Task<GamingPlatform> UpdateGamingPlatformAsync(Guid gamingPlatformId, string gamingPlatformName);
         Task<(bool, string)> DeleteGamingPlatformAsync(GamingPlatform gamingPlatform);
 
         // Genre Service 
         Task<List<Genre>> GetGenresAsync();
         Task<Genre> GetGenreAsync(Guid id);
-        Task<Genre> AddGenreAsync(Genre genre);
-        Task<VisualNovel> AddVisualNovelToGenreAsync(Guid genreId, Guid vnId);
-        Task<VisualNovel> DeleteVisualNovelToGenreAsync(Guid genreId, Guid vnId);
-        Task<Genre> UpdateGenreAsync(Genre genre);
+        Task<Genre> AddGenreAsync(string genreName);
+        void AddVisualNovelToGenreAsync(Guid genreId, Guid vnId);
+        void DeleteVisualNovelToGenreAsync(Guid genreId, Guid vnId);
+        Task<Genre> UpdateGenreAsync(Guid genreId, string genreName);
         Task<(bool, string)> DeleteGenreAsync(Genre genre);
 
         // Tag Novel Service 
         Task<List<Tag>> GetTagsAsync();
         Task<Tag> GetTagAsync(Guid id);
-        Task<Tag> AddTagAsync(Tag tag);
-        Task<VisualNovel> AddVisualNovelToTagAsync(Guid tagId, Guid vnId);
-        Task<VisualNovel> DeleteVisualNovelToTagAsync(Guid tagId, Guid vnId);
-        Task<Tag> UpdateTagAsync(Tag tag);
+        Task<Tag> AddTagAsync(string tagName);
+        void AddVisualNovelToTagAsync(Guid tagId, Guid vnId);
+        void DeleteVisualNovelToTagAsync(Guid tagId, Guid vnId);
+        Task<Tag> UpdateTagAsync(Guid id, string tagName);
         Task<(bool, string)> DeleteTagAsync(Tag tag);
 
         // Language Novel Service 
         Task<List<Language>> GetLanguagesAsync();
         Task<Language> GetLanguageAsync(Guid id);
-        Task<Language> AddLanguageAsync(Language language);
-        Task<VisualNovel> AddVisualNovelToLanguageAsync(Guid LanguageId, Guid vnId);
-        Task<VisualNovel> DeleteVisualNovelToLanguageAsync(Guid LanguageId, Guid vnId);
-        Task<Language> UpdateLanguageAsync(Language language);
+        Task<Language> AddLanguageAsync(string languageName);
+        void AddVisualNovelToLanguageAsync(Guid LanguageId, Guid vnId);
+        void DeleteVisualNovelToLanguageAsync(Guid LanguageId, Guid vnId);
+        Task<Language> UpdateLanguageAsync(Guid languageId, string languageName);
         Task<(bool, string)> DeleteLanguageAsync(Language language);
     }
 }

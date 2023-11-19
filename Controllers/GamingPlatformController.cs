@@ -42,31 +42,31 @@ namespace VN_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<GamingPlatform>> AddGamingPlatform(GamingPlatform gamingPlatform)
+        public async Task<ActionResult<GamingPlatform>> AddGamingPlatform([FromQuery] string gamingPlatformName)
         {
-            var dbGamingPlatform = await _novelService.AddGamingPlatformAsync(gamingPlatform);
+            var dbGamingPlatform = await _novelService.AddGamingPlatformAsync(gamingPlatformName);
 
             if (dbGamingPlatform == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{gamingPlatform.Name} could not be added.");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{gamingPlatformName} could not be added.");
             }
 
-            return CreatedAtAction("GetGamingPlatform", new { id = gamingPlatform.Id }, gamingPlatform);
+            return CreatedAtAction("GetGamingPlatform", new { id = dbGamingPlatform.Id }, dbGamingPlatform);
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateGamingPlatform(Guid id, GamingPlatform gamingPlatform)
+        public async Task<IActionResult> UpdateGamingPlatform([FromQuery] Guid id, [FromQuery] string gamingPlatformName)
         {
-            if (id != gamingPlatform.Id)
-            {
-                return BadRequest();
-            }
-
-            GamingPlatform dbGamingPlatform = await _novelService.UpdateGamingPlatformAsync(gamingPlatform);
+            GamingPlatform dbGamingPlatform = await _novelService.UpdateGamingPlatformAsync(id, gamingPlatformName);
 
             if (dbGamingPlatform == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{gamingPlatform.Name} could not be updated");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{gamingPlatformName} could not be updated");
+            }
+
+            if (id != dbGamingPlatform.Id)
+            {
+                return BadRequest();
             }
 
             return NoContent();

@@ -42,31 +42,31 @@ namespace VN_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Language>> AddLanguage(Language language)
+        public async Task<ActionResult<Language>> AddLanguage([FromQuery] string languageName)
         {
-            var dbLanguage = await _novelService.AddLanguageAsync(language);
+            var dbLanguage = await _novelService.AddLanguageAsync(languageName);
 
             if (dbLanguage == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{language.Name} could not be added.");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{languageName} could not be added.");
             }
 
-            return CreatedAtAction("GetLanguage", new { id = language.Id }, language);
+            return CreatedAtAction("GetLanguage", new { id = dbLanguage.Id }, dbLanguage);
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateLanguage(Guid id, Language language)
+        public async Task<IActionResult> UpdateLanguage([FromQuery] Guid id, [FromQuery] string languageName)
         {
-            if (id != language.Id)
+            Language dbGamingPlatform = await _novelService.UpdateLanguageAsync(id, languageName);
+
+            if (dbGamingPlatform == null)
             {
-                return BadRequest();
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{languageName} could not be updated");
             }
 
-            Language dbLanguage = await _novelService.UpdateLanguageAsync(language);
-
-            if (dbLanguage == null)
+            if (id != dbGamingPlatform.Id)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{language.Name} could not be updated");
+                return BadRequest();
             }
 
             return NoContent();

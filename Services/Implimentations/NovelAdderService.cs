@@ -28,6 +28,7 @@ namespace VN_API.Services
                 //    .Include(vn => vn.Platforms)
                 //    .Include(vn => vn.Languages)
                 //    .ToListAsync();
+                // Without Lazy Loading The Same Result
 
                 var visualNovels = _db.VisualNovels.ToListAsync();
 
@@ -86,16 +87,16 @@ namespace VN_API.Services
                 await _db.VisualNovels.AddAsync(visualNovel);
 
                 foreach (var gp in gamingPlatforms)
-                    await AddVisualNovelToGamingPlatformAsync(gp.Id, visualNovel.Id);
+                    AddVisualNovelToGamingPlatformAsync(gp.Id, visualNovel.Id);
 
                 foreach (var t in tags)
-                    await AddVisualNovelToTagAsync(t.Id, visualNovel.Id);
+                    AddVisualNovelToTagAsync(t.Id, visualNovel.Id);
 
                 foreach (var l in languages)
-                    await AddVisualNovelToLanguageAsync(l.Id, visualNovel.Id); ;
+                    AddVisualNovelToLanguageAsync(l.Id, visualNovel.Id); ;
 
                 foreach (var g in genres)
-                    await AddVisualNovelToGenreAsync(g.Id, visualNovel.Id);
+                    AddVisualNovelToGenreAsync(g.Id, visualNovel.Id);
 
                 await _db.SaveChangesAsync();
 
@@ -107,11 +108,41 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> UpdateVisualNovelAsync(VisualNovel vn)
+        public async Task<VisualNovel> UpdateVisualNovelAsync([FromBody] VisualNovel vn)
         {
             try
             {
-                _db.Entry(vn).State = EntityState.Modified;
+                var visualNovel = _db.VisualNovels
+                    .Include(dbvn => dbvn.Genres)
+                    .Include(dbvn => dbvn.Tags)
+                    .Include(dbvn => dbvn.Platforms)
+                    .Include(dbvn => dbvn.Languages)
+                    .FirstOrDefault(dbvn => dbvn.Id == vn.Id);
+
+                if (visualNovel == null)
+                {
+                    return null;
+                }
+
+                visualNovel.Title = vn.Title;
+                visualNovel.OriginalTitle = vn.OriginalTitle;
+                visualNovel.Autor = vn.Autor;
+                visualNovel.Rating = vn.Rating;
+                visualNovel.ReadingTime = vn.ReadingTime;
+                visualNovel.ReleaseYear = vn.ReleaseYear;
+                visualNovel.AddedUserName = vn.AddedUserName;
+                visualNovel.Description = vn.Description;
+                visualNovel.DateAdded = vn.DateAdded;
+                visualNovel.DateUpdated = DateTime.Now;
+
+
+                visualNovel.Genres = _db.Genres.Where(g => vn.Genres.Contains(g)).ToList();
+                visualNovel.Tags = _db.Tags.Where(t => vn.Tags.Contains(t)).ToList();
+                visualNovel.Platforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Contains(gp)).ToList();
+                visualNovel.Languages = _db.Languages.Where(l => vn.Languages.Contains(l)).ToList();
+
+                _db.Entry(visualNovel).State = EntityState.Modified;
+
                 await _db.SaveChangesAsync();
 
                 return vn;
@@ -193,10 +224,16 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<GamingPlatform> AddGamingPlatformAsync(GamingPlatform gamingPlatform)
+        public async Task<GamingPlatform> AddGamingPlatformAsync(string gamingPlatformName)
         {
             try
             {
+                var gamingPlatform = new GamingPlatform()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = gamingPlatformName,
+                };
+
                 await _db.GamingPlatforms.AddAsync(gamingPlatform);
                 await _db.SaveChangesAsync();
                 return await _db.GamingPlatforms.FindAsync(gamingPlatform.Id);
@@ -207,56 +244,49 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> AddVisualNovelToGamingPlatformAsync(Guid gpId, Guid vnId)
+        public void AddVisualNovelToGamingPlatformAsync(Guid gpId, Guid vnId)
         {
             try
             {
-                var gamingPlatform = await _db.GamingPlatforms.FindAsync(gpId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
-
-                if (gamingPlatform == null || vn == null)
-                {
-                    return null;
-                }
+                var gamingPlatform = _db.GamingPlatforms.Find(gpId);
+                var vn = _db.VisualNovels.Find(vnId);
 
                 gamingPlatform.VisualNovels.Add(vn);
                 //await _db.SaveChangesAsync();
-
-                return await _db.VisualNovels.FindAsync(vnId);
             }
             catch (Exception ex)
             {
-                return null;
+
             }
         }
 
-        public async Task<VisualNovel> DeleteVisualNovelToGamingPlatformAsync(Guid gpId, Guid vnId)
+        public void DeleteVisualNovelToGamingPlatformAsync(Guid gpId, Guid vnId)
         {
             try
             {
-                var gamingPlatform = await _db.GamingPlatforms.FindAsync(gpId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
+                var gamingPlatform = _db.GamingPlatforms.Find(gpId);
+                var vn = _db.VisualNovels.Find(vnId);
+                gamingPlatform.VisualNovels.Remove(vn);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+            }
+        }
 
-                if (gamingPlatform == null || vn == null)
+        public async Task<GamingPlatform> UpdateGamingPlatformAsync(Guid gamingPlatformId, string gamingPlatformName)
+        {
+            try
+            {
+                var gamingPlatform = await _db.GamingPlatforms.FindAsync(gamingPlatformId);
+
+                if (gamingPlatform == null)
                 {
                     return null;
                 }
 
-                gamingPlatform.VisualNovels.Remove(vn);
-                await _db.SaveChangesAsync();
+                gamingPlatform.Name = gamingPlatformName;
 
-                return await _db.VisualNovels.FindAsync(vnId);
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
-
-        public async Task<GamingPlatform> UpdateGamingPlatformAsync(GamingPlatform gamingPlatform)
-        {
-            try
-            {
                 _db.Entry(gamingPlatform).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
 
@@ -318,10 +348,16 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<Language> AddLanguageAsync(Language language)
+        public async Task<Language> AddLanguageAsync(string languageName)
         {
             try
             {
+                var language = new Language()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = languageName,
+                };
+
                 await _db.Languages.AddAsync(language);
                 await _db.SaveChangesAsync();
                 return await _db.Languages.FindAsync(language.Id);
@@ -332,56 +368,50 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> AddVisualNovelToLanguageAsync(Guid languageId, Guid vnId)
+        public void AddVisualNovelToLanguageAsync(Guid languageId, Guid vnId)
         {
             try
             {
-                var language = await _db.Languages.FindAsync(languageId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
-
-                if (language == null || vn == null)
-                {
-                    return null;
-                }
+                var language = _db.Languages.Find(languageId);
+                var vn = _db.VisualNovels.Find(vnId);
 
                 language.VisualNovels.Add(vn);
                 //await _db.SaveChangesAsync();
-
-                return await _db.VisualNovels.FindAsync(vnId);
             }
             catch (Exception ex)
             {
-                return null;
             }
         }
 
-        public async Task<VisualNovel> DeleteVisualNovelToLanguageAsync(Guid languageId, Guid vnId)
+        public void DeleteVisualNovelToLanguageAsync(Guid languageId, Guid vnId)
+        {
+            try
+            {
+                var language = _db.Languages.Find(languageId);
+                var vn = _db.VisualNovels.Find(vnId);
+
+                language.VisualNovels.Remove(vn);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+
+            }
+        }
+
+        public async Task<Language> UpdateLanguageAsync(Guid languageId, string languageName)
         {
             try
             {
                 var language = await _db.Languages.FindAsync(languageId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
 
-                if (language == null || vn == null)
+                if (language == null)
                 {
                     return null;
                 }
 
-                language.VisualNovels.Remove(vn);
-                await _db.SaveChangesAsync();
+                language.Name = languageName;
 
-                return await _db.VisualNovels.FindAsync(vnId);
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
-
-        public async Task<Language> UpdateLanguageAsync(Language language)
-        {
-            try
-            {
                 _db.Entry(language).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
 
@@ -397,7 +427,7 @@ namespace VN_API.Services
         {
             try
             {
-                var dbVn = await _db.GamingPlatforms.FindAsync(language.Id);
+                var dbVn = await _db.Languages.FindAsync(language.Id);
 
                 if (dbVn == null)
                 {
@@ -443,16 +473,14 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<Genre> AddGenreAsync([FromBody] Genre genre)
+        public async Task<Genre> AddGenreAsync(string genreName)
         {
             try
             {
                 var dbGenre = new Genre
                 {
-                    //Id = Guid.NewGuid(),
-                    Id = genre.Id,
-                    Name = genre.Name,
-                    // Другие свойства, если есть
+                    Id = Guid.NewGuid(),
+                    Name = genreName,
                 };
 
                 _db.Genres.Add(dbGenre);
@@ -466,56 +494,53 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> AddVisualNovelToGenreAsync(Guid genreId, Guid vnId)
+        public void AddVisualNovelToGenreAsync(Guid genreId, Guid vnId)
         {
             try
             {
-                var genre = await _db.Genres.FindAsync(genreId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
-
-                if (genre == null || vn == null)
-                {
-                    return null;
-                }
+                var genre = _db.Genres.Find(genreId);
+                var vn = _db.VisualNovels.Find(vnId);
 
                 genre.VisualNovels.Add(vn);
                 //await _db.SaveChangesAsync();
 
-                return await _db.VisualNovels.FindAsync(vnId);
             }
             catch (Exception ex)
             {
-                return null;
+
             }
         }
 
-        public async Task<VisualNovel> DeleteVisualNovelToGenreAsync(Guid genreId, Guid vnId)
+        public void DeleteVisualNovelToGenreAsync(Guid genreId, Guid vnId)
+        {
+            try
+            {
+                var genre = _db.Genres.Find(genreId);
+                var vn = _db.VisualNovels.Find(vnId);
+
+                genre.VisualNovels.Remove(vn);
+                //await _db.SaveChangesAsync();
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
+        public async Task<Genre> UpdateGenreAsync(Guid genreId, string genreName)
         {
             try
             {
                 var genre = await _db.Genres.FindAsync(genreId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
 
-                if (genre == null || vn == null)
+                if (genre == null)
                 {
                     return null;
                 }
 
-                genre.VisualNovels.Remove(vn);
-                await _db.SaveChangesAsync();
+                genre.Name = genreName;
 
-                return await _db.VisualNovels.FindAsync(vnId);
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
-
-        public async Task<Genre> UpdateGenreAsync(Genre genre)
-        {
-            try
-            {
                 _db.Entry(genre).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
 
@@ -577,10 +602,16 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<Tag> AddTagAsync(Tag tag)
+        public async Task<Tag> AddTagAsync(string tagName)
         {
             try
             {
+                var tag = new Tag()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = tagName,
+                };
+
                 await _db.Tags.AddAsync(tag);
                 await _db.SaveChangesAsync();
                 return await _db.Tags.FindAsync(tag.Id);
@@ -591,56 +622,51 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> AddVisualNovelToTagAsync(Guid tagId, Guid vnId)
+        public void AddVisualNovelToTagAsync(Guid tagId, Guid vnId)
         {
             try
             {
-                var tag = await _db.Tags.FindAsync(tagId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
+                var tag = _db.Tags.Find(tagId);
+                var vn = _db.VisualNovels.Find(vnId);
 
-                if (tag == null || vn == null)
-                {
-                    return null;
-                }
 
                 tag.VisualNovels.Add(vn);
                 //await _db.SaveChangesAsync();
-
-                return await _db.VisualNovels.FindAsync(vnId);
             }
             catch (Exception ex)
             {
-                return null;
             }
         }
 
-        public async Task<VisualNovel> DeleteVisualNovelToTagAsync(Guid tagId, Guid vnId)
+        public void DeleteVisualNovelToTagAsync(Guid tagId, Guid vnId)
+        {
+            try
+            {
+                var tag = _db.Tags.Find(tagId);
+                var vn = _db.VisualNovels.Find(vnId);
+
+                tag.VisualNovels.Remove(vn);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+
+            }
+        }
+
+        public async Task<Tag> UpdateTagAsync(Guid tagId, string tagName)
         {
             try
             {
                 var tag = await _db.Tags.FindAsync(tagId);
-                var vn = await _db.VisualNovels.FindAsync(vnId);
 
-                if (tag == null || vn == null)
+                if (tag == null)
                 {
                     return null;
                 }
 
-                tag.VisualNovels.Remove(vn);
-                await _db.SaveChangesAsync();
+                tag.Name = tagName;
 
-                return await _db.VisualNovels.FindAsync(vnId);
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
-
-        public async Task<Tag> UpdateTagAsync(Tag tag)
-        {
-            try
-            {
                 _db.Entry(tag).State = EntityState.Modified;
                 await _db.SaveChangesAsync();
 

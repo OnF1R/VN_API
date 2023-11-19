@@ -42,31 +42,31 @@ namespace VN_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Language>> AddTag(Tag tag)
+        public async Task<ActionResult<Language>> AddTag([FromQuery] string tagName)
         {
-            var dbTag = await _novelService.AddTagAsync(tag);
+            var dbTag = await _novelService.AddTagAsync(tagName);
 
             if (dbTag == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{tag.Name} could not be added.");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{tagName} could not be added.");
             }
 
-            return CreatedAtAction("GetTag", new { id = tag.Id }, tag);
+            return CreatedAtAction("GetTag", new { id = dbTag.Id }, dbTag);
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateTag(Guid id, Tag tag)
+        public async Task<IActionResult> UpdateTag([FromQuery] Guid id, [FromQuery] string tagName)
         {
-            if (id != tag.Id)
-            {
-                return BadRequest();
-            }
-
-            Tag dbTag = await _novelService.UpdateTagAsync(tag);
+            Tag dbTag = await _novelService.UpdateTagAsync(id, tagName);
 
             if (dbTag == null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, $"{tag.Name} could not be updated");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"{tagName} could not be updated");
+            }
+
+            if (id != dbTag.Id)
+            {
+                return BadRequest();
             }
 
             return NoContent();
