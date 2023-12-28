@@ -1,14 +1,13 @@
-﻿namespace VN_API.Models
+﻿using Microsoft.AspNetCore.Mvc;
+
+namespace VN_API.Models
 {
     public class VisualNovel
     {
-        public Guid Id { get; set; }
+        public int Id { get; set; }
         public string Title { get; set; }
         public string? OriginalTitle { get; set; }
-
-        public float Rating { get; set; }
-
-        //public byte[] CoverImage { get; set; }
+        public byte[]? CoverImage { get; set; } = null;
 
         //public int PageViewesCount { get; set; }
         //public int CommentsCount { get; set; }
@@ -23,8 +22,7 @@
         public string Autor { get; set; }
 
         public virtual List<Genre> Genres { get; set; }
-        public virtual List<Tag> Tags { get; set; }
-
+        public virtual List<TagMetadata> Tags { get; set; }
         public virtual List<Language> Languages { get; set; }
 
         public int ReleaseYear { get; set; }
@@ -32,6 +30,7 @@
         public DateTime DateAdded { get; set; }
         public DateTime DateUpdated { get; set; }
 
+        public Guid AdddeUserId { get; set; }
         public string AddedUserName { get; set; }
 
         public string Description { get; set; }

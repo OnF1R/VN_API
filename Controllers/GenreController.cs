@@ -29,7 +29,7 @@ namespace VN_API.Controllers
         }
 
         [HttpGet("id")]
-        public async Task<IActionResult> GetGenre(Guid id)
+        public async Task<IActionResult> GetGenre(int id)
         {
             Genre genre = await _novelService.GetGenreAsync(id);
 
@@ -55,7 +55,7 @@ namespace VN_API.Controllers
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateGenre([FromQuery] Guid id, [FromQuery] string genreName)
+        public async Task<IActionResult> UpdateGenre([FromQuery] int id, [FromQuery] string genreName)
         {
             Genre dbGamingPlatform = await _novelService.UpdateGenreAsync(id, genreName);
 
@@ -73,7 +73,7 @@ namespace VN_API.Controllers
         }
 
         [HttpDelete("id")]
-        public async Task<IActionResult> DeleteGenre(Guid id)
+        public async Task<IActionResult> DeleteGenre(int id)
         {
             var genre = await _novelService.GetGenreAsync(id);
             (bool status, string message) = await _novelService.DeleteGenreAsync(genre);

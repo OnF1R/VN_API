@@ -15,6 +15,8 @@ namespace VN_API
             // Add services to the container.
             builder.Services.AddTransient<INovelService, NovelAdderService>();
 
+            builder.Services.AddMemoryCache();
+
             builder.Services.AddCors();
 
             builder.Services.AddControllers()
@@ -36,9 +38,8 @@ namespace VN_API
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
-            }
 
-            app.UseHttpsRedirection();
+            }
 
             app.UseCors(builder =>
             {
@@ -46,6 +47,8 @@ namespace VN_API
                     .AllowAnyMethod()
                     .AllowAnyHeader();
             });
+
+            app.UseHttpsRedirection();
 
             app.UseAuthorization();
 

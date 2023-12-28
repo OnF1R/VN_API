@@ -29,7 +29,7 @@ namespace VN_API.Controllers
         }
 
         [HttpGet("id")]
-        public async Task<IActionResult> GetLanguage(Guid id)
+        public async Task<IActionResult> GetLanguage(int id)
         {
             Language language = await _novelService.GetLanguageAsync(id);
 
@@ -55,7 +55,7 @@ namespace VN_API.Controllers
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateLanguage([FromQuery] Guid id, [FromQuery] string languageName)
+        public async Task<IActionResult> UpdateLanguage([FromQuery] int id, [FromQuery] string languageName)
         {
             Language dbGamingPlatform = await _novelService.UpdateLanguageAsync(id, languageName);
 
@@ -73,7 +73,7 @@ namespace VN_API.Controllers
         }
 
         [HttpDelete("id")]
-        public async Task<IActionResult> DeleteLanguage(Guid id)
+        public async Task<IActionResult> DeleteLanguage(int id)
         {
             var language = await _novelService.GetLanguageAsync(id);
             (bool status, string message) = await _novelService.DeleteLanguageAsync(language);

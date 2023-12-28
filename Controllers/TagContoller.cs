@@ -29,7 +29,7 @@ namespace VN_API.Controllers
         }
 
         [HttpGet("id")]
-        public async Task<IActionResult> GetTag(Guid id)
+        public async Task<IActionResult> GetTag(int id)
         {
             Tag tag = await _novelService.GetTagAsync(id);
 
@@ -42,9 +42,9 @@ namespace VN_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Language>> AddTag([FromQuery] string tagName)
+        public async Task<ActionResult<Language>> AddTag([FromQuery] string tagName, [FromQuery] string description)
         {
-            var dbTag = await _novelService.AddTagAsync(tagName);
+            var dbTag = await _novelService.AddTagAsync(tagName, description);
 
             if (dbTag == null)
             {
@@ -55,7 +55,7 @@ namespace VN_API.Controllers
         }
 
         [HttpPut("id")]
-        public async Task<IActionResult> UpdateTag([FromQuery] Guid id, [FromQuery] string tagName)
+        public async Task<IActionResult> UpdateTag([FromQuery] int id, [FromQuery] string tagName)
         {
             Tag dbTag = await _novelService.UpdateTagAsync(id, tagName);
 
@@ -73,7 +73,7 @@ namespace VN_API.Controllers
         }
 
         [HttpDelete("id")]
-        public async Task<IActionResult> DeleteTag(Guid id)
+        public async Task<IActionResult> DeleteTag(int id)
         {
             var tag = await _novelService.GetTagAsync(id);
             (bool status, string message) = await _novelService.DeleteTagAsync(tag);
