@@ -6,16 +6,80 @@ namespace VN_API.Services.Interfaces
     public interface INovelService
     {
         // Visual Novel Service 
+        /// <summary>
+        /// Get Visual Novel From Database using pagination options
+        /// </summary>
+        /// <param name="params">PaginationParams Model</param>
+        /// <returns>List<VisualNovel> if there are one or more matches, otherwise null</returns>
         Task<List<VisualNovel>> GetVisualNovelsAsync(PaginationParams @params);
-        Task<VisualNovel> GetVisualNovelAsync(int id);
+        /// <summary>
+        /// Get Visual Novel From Database by identifier with tags Spoiler Level
+        /// </summary>
+        /// <param name="id">The Visual Novel ID corresponding to the record in the database</param>
+        /// <param name="spoilerLevel">The Spoiler Level enum value</param>
+        /// <returns>VisualNovel if a match was found, otherwise null</returns>
+        Task<VisualNovel> GetVisualNovelAsync(int id, SpoilerLevel spoilerLevel = SpoilerLevel.None);
+        /// <summary>
+        /// Add Visual Novel To Database
+        /// </summary>
+        /// <param name="visualNovel">VisualNovel Model</param>
+        /// <returns>Visual Novel if Visual Novel was added to database, otherwise null</returns>
         Task<VisualNovel> AddVisualNovelAsync(VisualNovel visualNovel);
+        /// <summary>
+        /// Add byte[] to Visual Novel CoverImage Column in Database
+        /// </summary>
+        /// <param name="id">The Visual Novel ID corresponding to the record in the database</param>
+        /// <param name="coverImage">Already verified image file (png, jpg, jpeg, bmp, tiff, gif)</param>
+        /// <returns>Visual Novel if Cover Image was added to Visual Novel, otherwise null</returns>
         Task<VisualNovel> AddCoverImageToVisualNovel(int id, IFormFile coverImage);
+        /// <summary>
+        /// Update Visual Novel Record in Database
+        /// </summary>
+        /// <param name="visualNovel">VisualNovel model, where Id has a match in the database</param>
+        /// <returns>Visual Novel if Visual Novel was updated, otherwise null</returns>
         Task<VisualNovel> UpdateVisualNovelAsync(VisualNovel visualNovel);
+        /// <summary>
+        /// Delete Visual Novel Record From Database
+        /// </summary>
+        /// <param name="visualNovel">VisualNovel model, where Id has a match in the database</param>
+        /// <returns>True if Visual Novel was removed and successful message, otherwise false and error message</returns>
         Task<(bool, string)> DeleteVisualNovelAsync(VisualNovel visualNovel);
+        /// <summary>
+        /// Get Visual Novels From Database With Tag and None Spoiler Level 
+        /// </summary>
+        /// <param name="tagId">The Tag ID corresponding to the record in the database</param>
+        /// <returns>List VisualNovel if there are one or more matches, otherwise null</returns>
         Task<List<VisualNovel>> GetVisualNovelsWithTagAsync(int tagId);
+        /// <summary>
+        /// Get Visual Novel From Database With Tag and Spoiler Level
+        /// </summary>
+        /// <param name="tagId">The Tag ID corresponding to the record in the database</param>
+        /// <param name="spoilerLevel">The Spoiler Level enum value</param>
+        /// <returns>List VisualNovel if there are one or more matches, otherwise null</returns>
+        Task<List<VisualNovel>> GetVisualNovelsWithTagAndSpoilerLevelAsync(int tagId, SpoilerLevel spoilerLevel);
+        /// <summary>
+        /// Get Visual Novels From Database With Genre 
+        /// </summary>
+        /// <param name="genreId">The Genre ID corresponding to the record in the database</param>
+        /// <returns>List VisualNovel if there are one or more matches, otherwise null</returns>
         Task<List<VisualNovel>> GetVisualNovelsWithGenreAsync(int genreId);
+        /// <summary>
+        /// Get Visual Novels From Database With Language
+        /// </summary>
+        /// <param name="languageId">The Language ID corresponding to the record in the database</param>
+        /// <returns>List VisualNovel if there are one or more matches, otherwise null</returns>
         Task<List<VisualNovel>> GetVisualNovelsWithLanguageAsync(int languageId);
+        /// <summary>
+        /// Get Visual Novel From Database With Gaming Platform
+        /// </summary>
+        /// <param name="gamingPlatformId">The Gaming Platform ID corresponding to the record in the database</param>
+        /// <returns>List VisualNovel if there are one or more matches, otherwise null</returns>
         Task<List<VisualNovel>> GetVisualNovelsWithGamingPlatformAsync(int gamingPlatformId);
+        /// <summary>
+        /// Search Visual Novels in Database based on a match in the title
+        /// </summary>
+        /// <param name="visualNovelTitleQuery">Suggested title of the Visual Novel or part thereof</param>
+        /// <returns>List VisualNovel if there are one or more matches, otherwise null</returns>
         Task<List<VisualNovel>> SearchVisualNovel(string visualNovelTitleQuery);
 
         //Task<List<GamingPlatform>> GetVisualNovelGamingPlatformsAsync(int id);

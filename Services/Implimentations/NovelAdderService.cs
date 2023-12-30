@@ -57,7 +57,7 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> GetVisualNovelAsync(int id)
+        public async Task<VisualNovel> GetVisualNovelAsync(int id, SpoilerLevel spoilerLevel)
         {
             try
             {
@@ -65,7 +65,7 @@ namespace VN_API.Services
 
                 VisualNovel visualNovel = await _db.VisualNovels
                     .Include(vn => vn.Genres)
-                    .Include(vn => vn.Tags)
+                    .Include(vn => vn.Tags.Where(tag => tag.SpoilerLevel <= spoilerLevel))
                         .ThenInclude(tag => tag.Tag)
                     .Include(vn => vn.Platforms)
                     .Include(vn => vn.Languages)
@@ -281,7 +281,9 @@ namespace VN_API.Services
         {
             try
             {
-                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Tags.Any(tag => tag.Tag.Id == tagId)).ToListAsync();
+                List<VisualNovel> vns = await _db.VisualNovels
+                    .Where(vn => vn.Tags.Any(tag => tag.Tag.Id == tagId && tag.SpoilerLevel == SpoilerLevel.None))
+                    .ToListAsync();
 
                 if (vns.Count <= 0)
                 {
@@ -292,7 +294,27 @@ namespace VN_API.Services
             }
             catch (Exception)
             {
+                throw;
+            }
+        }
 
+        public async Task<List<VisualNovel>> GetVisualNovelsWithTagAndSpoilerLevelAsync(int tagId, SpoilerLevel spoilerLevel)
+        {
+            try
+            {
+                List<VisualNovel> vns = await _db.VisualNovels
+                    .Where(vn => vn.Tags.Any(tag => tag.Tag.Id == tagId && tag.SpoilerLevel <= spoilerLevel))
+                    .ToListAsync();
+
+                if (vns.Count <= 0)
+                {
+                    return null;
+                }
+
+                return vns;
+            }
+            catch (Exception)
+            {
                 throw;
             }
         }
@@ -301,7 +323,7 @@ namespace VN_API.Services
         {
             try
             {
-                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Genres.Any(tag => tag.Id == genreId)).ToListAsync();
+                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Genres.Any(genre => genre.Id == genreId)).ToListAsync();
 
                 if (vns.Count <= 0)
                 {
@@ -321,7 +343,7 @@ namespace VN_API.Services
         {
             try
             {
-                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Languages.Any(tag => tag.Id == languageId)).ToListAsync();
+                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Languages.Any(language => language.Id == languageId)).ToListAsync();
 
                 if (vns.Count <= 0)
                 {
@@ -341,7 +363,7 @@ namespace VN_API.Services
         {
             try
             {
-                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Platforms.Any(tag => tag.Id == gamingPlatformId)).ToListAsync();
+                List<VisualNovel> vns = await _db.VisualNovels.Where(vn => vn.Platforms.Any(gamingPlatform => gamingPlatform.Id == gamingPlatformId)).ToListAsync();
 
                 if (vns.Count <= 0)
                 {

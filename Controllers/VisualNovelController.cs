@@ -37,9 +37,9 @@ namespace VN_API.Controllers
         }
 
         [HttpGet("id")]
-        public async Task<IActionResult> GetVisualNovel(int id)
+        public async Task<IActionResult> GetVisualNovel(int id, SpoilerLevel spoilerLevel)
         {
-            VisualNovel vn = await _novelService.GetVisualNovelAsync(id);
+            VisualNovel vn = await _novelService.GetVisualNovelAsync(id, spoilerLevel);
 
             if (vn == null)
             {
@@ -61,6 +61,21 @@ namespace VN_API.Controllers
 
             return StatusCode(StatusCodes.Status200OK, vns);
         }
+
+        [HttpGet("WithTagAndSpoilerLevel")]
+        public async Task<ActionResult<VisualNovel>> GetVisualNovelsWithTagAndSpoilerLevelAsync(int tagId, SpoilerLevel spoilerLevel)
+        {
+            var vns = await _novelService.GetVisualNovelsWithTagAndSpoilerLevelAsync(tagId, spoilerLevel);
+
+            if (vns == null)
+            {
+                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels with this tag in database");
+            }
+
+            return StatusCode(StatusCodes.Status200OK, vns);
+        }
+
+
 
         [HttpGet("WithGenre")]
         public async Task<ActionResult<VisualNovel>> GetVisualNovelsWithGenre(int genreId)
