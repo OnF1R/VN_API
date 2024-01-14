@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text;
 using VN_API.Database;
 using VN_API.Models;
 using VN_API.Models.Pagination;
@@ -98,7 +99,6 @@ namespace VN_API.Services
 
                 var visualNovel = new VisualNovel()
                 {
-                    Id = vn.Id,
                     Title = vn.Title,
                     CoverImage = null,
                     OriginalTitle = vn.OriginalTitle,
@@ -226,7 +226,7 @@ namespace VN_API.Services
 
                 await _db.SaveChangesAsync();
 
-                return vn;
+                return visualNovel;
             }
             catch (Exception ex)
             {
@@ -386,7 +386,11 @@ namespace VN_API.Services
                 if (query.Length < 3 || string.IsNullOrWhiteSpace(query))
                     return null;
 
-                return await _db.VisualNovels.Where(vn => vn.Title.ToLower().Contains(query.Trim().ToLower())).ToListAsync();
+                query = query.ToLower();
+
+                var vns = await _db.VisualNovels.Where(vn => vn.Title.ToLower().Contains(query)).ToListAsync(); // TODO
+
+                return vns;
             }
             catch (Exception)
             {

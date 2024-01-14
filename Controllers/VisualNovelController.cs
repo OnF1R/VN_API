@@ -139,7 +139,7 @@ namespace VN_API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, $"{visualNovel.Title} could not be added.");
             }
 
-            return CreatedAtAction("GetVisualNovel", new { id = visualNovel.Id }, visualNovel);
+            return CreatedAtAction("GetVisualNovel", new { id = dbvn.Id }, dbvn);
         }
 
         [HttpPut("AddImage")]
