@@ -188,6 +188,7 @@ namespace VN_API.Services
                 var visualNovel = _db.VisualNovels
                     .Include(dbvn => dbvn.Genres)
                     .Include(dbvn => dbvn.Tags)
+                        .ThenInclude(tag => tag.Tag)
                     .Include(dbvn => dbvn.Platforms)
                     .Include(dbvn => dbvn.Languages)
                     .FirstOrDefault(dbvn => dbvn.Id == vn.Id);
@@ -204,7 +205,7 @@ namespace VN_API.Services
                 visualNovel.ReleaseYear = vn.ReleaseYear;
                 visualNovel.AddedUserName = vn.AddedUserName;
                 visualNovel.Description = vn.Description;
-                visualNovel.DateAdded = vn.DateAdded;
+                //visualNovel.DateAdded = vn.DateAdded;
                 visualNovel.DateUpdated = DateTime.Now;
 
                 foreach (var tag in visualNovel.Tags)
