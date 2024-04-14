@@ -2,10 +2,10 @@
 {
     public class VisualNovelRating
     {
-        //public Guid Id { get; set; }
-        //public int UserId { get; set; }
-        //public int VisualNovelId { get; set; }
-        //public int Rating { get; set; }
-        //public DateTime AddingTime { get; set; }
+        public Guid Id { get; set; }
+        public Guid UserId { get; set; }
+        public int VisualNovelId { get; set; }
+        public int Rating { get; set; }
+        public DateTime AddingTime { get; set; }
     }
 }

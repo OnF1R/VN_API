@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using VN_API.Database;
 using VN_API.Services;
+using VN_API.Services.Implimentations;
 using VN_API.Services.Interfaces;
 
 namespace VN_API
@@ -17,6 +18,7 @@ namespace VN_API
 
             // Add services to the container.
             builder.Services.AddTransient<INovelService, NovelAdderService>();
+            builder.Services.AddTransient<IVNDBQueriesService, VNDBQueriesService>();
 
             builder.Services.AddMemoryCache();
 
@@ -26,6 +28,7 @@ namespace VN_API
                 .AddJsonOptions(x => x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+            //string connectionString = "Server=localhost;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;";
             builder.Services.AddDbContext<ApplicationContext>(options =>
                 options.UseNpgsql(connectionString));
 
