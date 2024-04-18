@@ -216,5 +216,23 @@ namespace VN_API.Services.Interfaces
         Task DeleteVisualNovelToTranslatorAsync(int translatorId, int vnId);
         Task<Translator> UpdateTranslatorAsync(int translatorId, Translator translator);
         Task<(bool, string)> DeleteTranslatorAsync(Translator translator);
+
+        // Download Links Service
+        Task<List<DownloadLink>> GetDownloadLinks();
+        Task<List<DownloadLink>> GetDownloadLinksForVisualNovel(int id);
+        Task<DownloadLink> AddDownloadLinkAsync(DownloadLink downloadLink);
+        Task AddDownloadLinksToVisualNovelAsync(Guid downloadLinkId, int vnId);
+        Task DeleteDownloadLinksToVisualNovelAsync(Guid downloadLinkId, int vnId);
+        Task<DownloadLink> UpdateDownloadLink(Guid downloadLinkId, DownloadLink downloadLink);
+        Task<(bool, string)> DeleteDownloadLink(DownloadLink downloadLink);
+
+        // Other Links Service
+        Task<List<OtherLink>> GetOtherLinks();
+        Task<List<OtherLink>> GetOtherLinksForVisualNovel(int id);
+        Task<OtherLink> AddOtherLinkAsync(OtherLink otherLink);
+        Task AddOtherLinksToVisualNovelAsync(Guid otherLinkId, int vnId);
+        Task DeleteOtherLinksToVisualNovelAsync(Guid otherLinkId, int vnId);
+        Task<OtherLink> UpdateOtherLink(Guid otherLinkId, OtherLink otherLink);
+        Task<(bool, string)> DeleteOtherLink(OtherLink otherLink);
     }
 }

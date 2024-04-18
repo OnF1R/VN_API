@@ -14,6 +14,8 @@ namespace VN_API.Database
         public DbSet<Author> Authors { get; set; }
         public DbSet<Translator> Translators { get; set; }
         public DbSet<VisualNovelRating> Rating { get; set; }
+        public DbSet<DownloadLink> DownloadLinks { get; set; }
+        public DbSet<OtherLink> OtherLinks { get; set; }
 
         public ApplicationContext(DbContextOptions<ApplicationContext> options) : base(options)
         {

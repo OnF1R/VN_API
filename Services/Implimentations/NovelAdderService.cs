@@ -353,6 +353,7 @@ namespace VN_API.Services
                     .Include(vn => vn.Translator)
                     .Include(vn => vn.Author)
                     .Include(vn => vn.Links)
+                    .Include(vn => vn.OtherLinks)
                     .FirstOrDefaultAsync(vn => vn.Id == id);
 
                 if (visualNovel == null)
@@ -517,6 +518,7 @@ namespace VN_API.Services
                     ReadingTime = vn.ReadingTime,
                     Status = vn.Status,
                     SteamLink = vn.SteamLink,
+                    TranslateLinkForSteam = vn.TranslateLinkForSteam,
                     
                     ReleaseYear = vn.ReleaseYear,
 
@@ -533,7 +535,7 @@ namespace VN_API.Services
                     Tags = null,
                     Genres = null,
                     Languages = null,
-                    Links = vn.Links,
+                    //Links = vn.Links,
                 };
 
                 await _db.VisualNovels.AddAsync(visualNovel);
@@ -560,7 +562,28 @@ namespace VN_API.Services
                 if (vn.Translator != null)
                     await AddVisualNovelToTranslatorAsync(vn.Translator.Id, visualNovel.Id);
 
+                if (vn.Links != null)
+                {
+                    foreach (var link in vn.Links)
+                    {
+                        await AddDownloadLinkAsync(link);
+                        await AddDownloadLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                    }
+                }     
+
+                if (vn.OtherLinks != null)
+                {
+                    foreach (var link in vn.OtherLinks)
+                    {
+                        await AddOtherLinkAsync(link);
+                        await AddOtherLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                    }
+                        
+                }
+                    
                 await _db.SaveChangesAsync();
+
+                await LoadOrUpdateVNDBRating(visualNovel.Id);
 
                 return await _db.VisualNovels.FindAsync(visualNovel.Id);
             }
@@ -747,6 +770,10 @@ namespace VN_API.Services
                         .ThenInclude(tag => tag.Tag)
                     .Include(dbvn => dbvn.Platforms)
                     .Include(dbvn => dbvn.Languages)
+                    .Include(dbvn => dbvn.Translator)
+                    .Include(dbvn => dbvn.Author)
+                    .Include(dbvn => dbvn.Links)
+                    .Include(dbvn => dbvn.OtherLinks)
                     .FirstOrDefault(dbvn => dbvn.Id == vn.Id);
 
                 if (visualNovel == null)
@@ -757,33 +784,67 @@ namespace VN_API.Services
                 visualNovel.Title = vn.Title;
                 visualNovel.VndbId = vn.VndbId;
                 visualNovel.OriginalTitle = vn.OriginalTitle;
-                visualNovel.Author = vn.Author;
                 visualNovel.Status = vn.Status;
                 visualNovel.ReadingTime = vn.ReadingTime;
                 visualNovel.ReleaseYear = vn.ReleaseYear;
                 visualNovel.AddedUserName = vn.AddedUserName;
                 visualNovel.Description = vn.Description;
-                visualNovel.Author = vn.Author;
+                
                 visualNovel.SteamLink = vn.SteamLink;
-                visualNovel.Translator = vn.Translator;
-                visualNovel.Links = vn.Links;
+                visualNovel.TranslateLinkForSteam = vn.TranslateLinkForSteam;
+                //visualNovel.Translator = vn.Translator;
+                //visualNovel.Links = vn.Links;
                 //visualNovel.DateAdded = vn.DateAdded;
                 visualNovel.DateUpdated = DateTime.Now;
 
                 foreach (var tag in visualNovel.Tags)
-                {
                     DeleteTagMetadataToVisualNovelAsync(tag.Tag.Id, visualNovel.Id);
-                }
 
                 foreach (var tag in vn.Tags)
-                {
                     AddTagMetadataToVisualNovelAsync(tag.Tag.Id, visualNovel.Id, tag.SpoilerLevel);
-                }
 
                 //visualNovel.Tags = _db.TagsMetadata.Where(t => vn.Tags.Contains(t)).ToList();
                 visualNovel.Genres = _db.Genres.Where(g => vn.Genres.Contains(g)).ToList();
                 visualNovel.Platforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Contains(gp)).ToList();
                 visualNovel.Languages = _db.Languages.Where(l => vn.Languages.Contains(l)).ToList();
+                visualNovel.Author = _db.Authors.Where(a => vn.Author.Contains(a)).ToList();
+                if (vn.Translator is not null)
+                    visualNovel.Translator = await _db.Translators.FindAsync(vn.Translator.Id);
+
+                List<DownloadLink> tempDownloadLinks = new List<DownloadLink>();
+
+                tempDownloadLinks.AddRange(visualNovel.Links);
+
+                //TODO Maybe change??
+                foreach (var downloadLink in tempDownloadLinks)
+                {
+                    await DeleteDownloadLinksToVisualNovelAsync(downloadLink.Id, visualNovel.Id);
+                    await DeleteDownloadLink(downloadLink);
+                }
+
+                foreach (var downloadLink in vn.Links)
+                {
+                    var link = await AddDownloadLinkAsync(downloadLink);
+                    await AddDownloadLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                }
+
+                List<OtherLink> tempOtherLinks = new List<OtherLink>();
+
+                tempOtherLinks.AddRange(visualNovel.OtherLinks);
+
+                foreach (var otherLink in tempOtherLinks)
+                {
+                    await DeleteOtherLinksToVisualNovelAsync(otherLink.Id, visualNovel.Id);
+                    await DeleteOtherLink(otherLink);
+                }
+
+                foreach (var otherLink in vn.OtherLinks)
+                {
+                    var link = await AddOtherLinkAsync(otherLink);
+                    await AddOtherLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                }
+
+                await LoadOrUpdateVNDBRating(visualNovel.Id);
 
                 _db.Entry(visualNovel).State = EntityState.Modified;
 
@@ -2016,7 +2077,262 @@ namespace VN_API.Services
                 return (false, $"Error, {ex.Message}");
             }
         }
-
         #endregion
+        #region Download Links
+        public async Task<List<DownloadLink>> GetDownloadLinks()
+        {
+            try
+            {
+                return await _db.DownloadLinks.ToListAsync();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public async Task<List<DownloadLink>> GetDownloadLinksForVisualNovel(int id)
+        {
+            try
+            {
+                return await _db.DownloadLinks.Where(link => link.VisualNovel.Id == id).ToListAsync();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public async Task<DownloadLink> AddDownloadLinkAsync(DownloadLink downloadLink)
+        {
+            try
+            {
+                DownloadLink link = new DownloadLink()
+                {
+                    Id = downloadLink.Id,
+                    Url = downloadLink.Url,
+                    GamingPlatform = await GetGamingPlatformAsync(downloadLink.GamingPlatform.Id),
+                };
+
+                _db.DownloadLinks.Add(link);
+
+                //await _db.SaveChangesAsync();
+
+                return await _db.DownloadLinks.FindAsync(link.Id);
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+        }
+
+        public async Task AddDownloadLinksToVisualNovelAsync(Guid downloadLinkId, int vnId)
+        {
+            try
+            {
+                var downloadLink = await _db.DownloadLinks.FindAsync(downloadLinkId);
+                var vn = await _db.VisualNovels.FindAsync(vnId);
+
+                vn.Links.Add(downloadLink);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+        }
+
+        public async Task DeleteDownloadLinksToVisualNovelAsync(Guid downloadLinkId, int vnId)
+        {
+            try
+            {
+                var downloadLink = await _db.DownloadLinks.FindAsync(downloadLinkId);
+                var vn = await _db.VisualNovels.FindAsync(vnId);
+
+                vn.Links.Remove(downloadLink);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+        }
+
+        public async Task<DownloadLink> UpdateDownloadLink(Guid downloadLinkId, DownloadLink downloadLink)
+        {
+            try
+            {
+                DownloadLink dbDownloadLink = await _db.DownloadLinks.FindAsync(downloadLinkId);
+
+                if (dbDownloadLink == null)
+                {
+                    return null;
+                }
+
+                dbDownloadLink = downloadLink;
+
+                _db.Entry(dbDownloadLink).State = EntityState.Modified;
+
+                await _db.SaveChangesAsync();
+
+                return dbDownloadLink;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public async Task<(bool, string)> DeleteDownloadLink(DownloadLink downloadLink)
+        {
+            try
+            {
+                DownloadLink dbDownloadLink = await _db.DownloadLinks.FindAsync(downloadLink.Id);
+
+                if (dbDownloadLink == null)
+                {
+                    return (false, "Download link could not be found");
+                }
+
+                _db.DownloadLinks.Remove(dbDownloadLink);
+
+                //await _db.SaveChangesAsync();
+
+                return (true, "Download link got deleted");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Error, {ex.Message}");
+            }
+        }
+        #endregion
+        #region Other Links
+
+        public async Task<List<OtherLink>> GetOtherLinks()
+        {
+            try
+            {
+                return await _db.OtherLinks.ToListAsync();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public async Task<List<OtherLink>> GetOtherLinksForVisualNovel(int id)
+        {
+            try
+            {
+                return await _db.OtherLinks.Where(link => link.VisualNovel.Id == id).ToListAsync();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public async Task<OtherLink> AddOtherLinkAsync(OtherLink otherLink)
+        {
+            try
+            {
+                _db.OtherLinks.Add(otherLink);
+
+                //await _db.SaveChangesAsync();
+
+                return await _db.OtherLinks.FindAsync(otherLink.Id);
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+        }
+
+        public async Task AddOtherLinksToVisualNovelAsync(Guid otherLinkId, int vnId)
+        {
+            try
+            {
+                var otherLink = await _db.OtherLinks.FindAsync(otherLinkId);
+                var vn = await _db.VisualNovels.FindAsync(vnId);
+
+                vn.OtherLinks.Add(otherLink);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task DeleteOtherLinksToVisualNovelAsync(Guid otherLinkId, int vnId)
+        {
+            try
+            {
+                var otherLink = await _db.OtherLinks.FindAsync(otherLinkId);
+                var vn = await _db.VisualNovels.FindAsync(vnId);
+
+                vn.OtherLinks.Remove(otherLink);
+                //await _db.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<OtherLink> UpdateOtherLink(Guid otherLinkId, OtherLink otherLink)
+        {
+            try
+            {
+                OtherLink dbOtherLink = await _db.OtherLinks.FindAsync(otherLinkId);
+
+                if (dbOtherLink == null)
+                {
+                    return null;
+                }
+
+                dbOtherLink = otherLink;
+
+                _db.Entry(dbOtherLink).State = EntityState.Modified;
+
+                await _db.SaveChangesAsync();
+
+                return dbOtherLink;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        public async Task<(bool, string)> DeleteOtherLink(OtherLink otherLink)
+        {
+            try
+            {
+                OtherLink dbOtherLink = await _db.OtherLinks.FindAsync(otherLink.Id);
+
+                if (dbOtherLink == null)
+                {
+                    return (false, "Other link could not be found");
+                }
+
+                _db.OtherLinks.Remove(dbOtherLink);
+
+                //await _db.SaveChangesAsync();
+
+                return (true, "Other link got deleted");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Error, {ex.Message}");
+            }
+        }
+
+        
     }
 }
+        #endregion

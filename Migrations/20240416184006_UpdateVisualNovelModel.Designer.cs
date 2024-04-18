@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VN_API.Database;
@@ -11,9 +12,11 @@ using VN_API.Database;
 namespace VNAPI.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240416184006_UpdateVisualNovelModel")]
+    partial class UpdateVisualNovelModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -118,7 +121,7 @@ namespace VNAPI.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("VisualNovelId")
+                    b.Property<int>("VisualNovelId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -127,7 +130,7 @@ namespace VNAPI.Migrations
 
                     b.HasIndex("VisualNovelId");
 
-                    b.ToTable("DownloadLinks");
+                    b.ToTable("DownloadLink");
                 });
 
             modelBuilder.Entity("VN_API.Models.GamingPlatform", b =>
@@ -195,14 +198,14 @@ namespace VNAPI.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("VisualNovelId")
+                    b.Property<int>("VisualNovelId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("VisualNovelId");
 
-                    b.ToTable("OtherLinks");
+                    b.ToTable("OtherLink");
                 });
 
             modelBuilder.Entity("VN_API.Models.Tag", b =>
@@ -435,7 +438,9 @@ namespace VNAPI.Migrations
 
                     b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
                         .WithMany("Links")
-                        .HasForeignKey("VisualNovelId");
+                        .HasForeignKey("VisualNovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("GamingPlatform");
 
@@ -446,7 +451,9 @@ namespace VNAPI.Migrations
                 {
                     b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
                         .WithMany("OtherLinks")
-                        .HasForeignKey("VisualNovelId");
+                        .HasForeignKey("VisualNovelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("VisualNovel");
                 });
