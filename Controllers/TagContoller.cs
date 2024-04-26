@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
+using System.Text.Json;
 using VN_API.Models;
+using VN_API.Models.Pagination;
 using VN_API.Services.Interfaces;
 
 namespace VN_API.Controllers
@@ -16,16 +19,37 @@ namespace VN_API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetTags()
+        public async Task<IActionResult> GetTags([FromQuery] PaginationParams @params)
         {
-            var tags = await _novelService.GetTagsAsync();
+            var tags = await _novelService.GetTagsAsync(@params);
 
-            if (tags == null)
+            var paginationMetadata = new PaginationMetadata(tags.Item2, @params.Page, @params.ItemsPerPage);
+
+            Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(paginationMetadata));
+
+            if (tags.Item1 == null)
             {
                 return StatusCode(StatusCodes.Status204NoContent, "No Tags in database");
             }
 
-            return StatusCode(StatusCodes.Status200OK, tags);
+            return StatusCode(StatusCodes.Status200OK, tags.Item1);
+        }
+
+        [HttpGet("Search")]
+        public async Task<IActionResult> SearchTags([FromQuery] PaginationParams @params, string query)
+        {
+            var tags = await _novelService.SearchTags(@params, query);
+
+            var paginationMetadata = new PaginationMetadata(tags.Item2, @params.Page, @params.ItemsPerPage);
+
+            Response.Headers.Add("X-Pagination", JsonSerializer.Serialize(paginationMetadata));
+
+            if (tags.Item1 == null)
+            {
+                return StatusCode(StatusCodes.Status204NoContent, "No Tags in database");
+            }
+
+            return StatusCode(StatusCodes.Status200OK, tags.Item1);
         }
 
         [HttpGet("id")]

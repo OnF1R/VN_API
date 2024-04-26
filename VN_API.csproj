@@ -30,6 +30,10 @@
     <Folder Include="Data\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="GTranslatorAPI\GTranslatorAPI.csproj" />
+  </ItemGroup>
+
   <ProjectExtensions><VisualStudio><UserProperties appsettings_1json__JsonSchema="https://cdn.sdf.com/schemas/sdf-schema-1.1.json" /></VisualStudio></ProjectExtensions>
 
 </Project>

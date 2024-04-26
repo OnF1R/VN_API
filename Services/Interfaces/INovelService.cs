@@ -8,6 +8,8 @@ namespace VN_API.Services.Interfaces
     {
         Task LoadVNDBRating();
         Task LoadOrUpdateVNDBRating(int id);
+
+        Task ParseVNDBTags();
         // Visual Novel Service 
         /// <summary>
         /// Get Visual Novel From Database using pagination options
@@ -163,7 +165,8 @@ namespace VN_API.Services.Interfaces
         Task<(bool, string)> DeleteGenreAsync(Genre genre);
 
         // Tag Novel Service 
-        Task<List<Tag>> GetTagsAsync();
+        Task<(List<Tag>, int)> GetTagsAsync(PaginationParams @params);
+        Task<(List<Tag>, int)> SearchTags(PaginationParams @params, string query);
         Task<Tag> GetTagAsync(int id);
         Task<Tag> AddTagAsync(string tagName, string description);
         //void AddVisualNovelToTagAsync(int tagId, int vnId, SpoilerLevel spoilerLevel);

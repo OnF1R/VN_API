@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -94,6 +95,52 @@ namespace VN_API.Services
 
                 throw;
             }
+        }
+
+        public static string FirstCharToUpper(string input) =>
+        input switch
+        {
+            null => throw new ArgumentNullException(nameof(input)),
+            "" => throw new ArgumentException($"{nameof(input)} cannot be empty", nameof(input)),
+            _ => input[0].ToString().ToUpper() + input.Substring(1)
+        };
+
+        public async Task ParseVNDBTags()
+        {
+            var vndbService = new VNDBQueriesService();
+            var translator = new GTranslatorAPI.Translator();
+            bool isMore = false;
+            string currentTagId = "";
+
+            do
+            {
+                var tagsData = await vndbService.GetTags(currentTagId, isMore);
+                isMore = tagsData.More;
+
+                foreach (var tag in tagsData.Results)
+                {
+                    var translateResult = await translator.TranslateAsync(GTranslatorAPI.Languages.en, GTranslatorAPI.Languages.ru, tag.Name);
+                    var tranlatedName = FirstCharToUpper(translateResult.TranslatedText);
+
+                    var newTag = new Tag
+                    {
+                        VndbId = tag.Id,
+                        EnglishName = tag.Name,
+                        Name = tranlatedName,
+                        Category = tag.Category,
+                        Applicable = tag.Applicable,
+                    };
+
+                    await _db.Tags.AddAsync(newTag);
+
+                    Console.WriteLine($"{tranlatedName} тег добавлен.");
+                }
+
+                currentTagId = tagsData.Results[^1].Id;
+
+            } while (isMore);
+
+            await _db.SaveChangesAsync();
         }
 
         #region Visual Novel
@@ -1429,15 +1476,60 @@ namespace VN_API.Services
 
         #region Tag
 
-        public async Task<List<Tag>> GetTagsAsync()
+        public async Task<(List<Tag>, int)> GetTagsAsync(PaginationParams @params)
         {
             try
             {
-                return await _db.Tags.ToListAsync();
+                var position = (@params.Page - 1) * @params.ItemsPerPage;
+
+                var paginatedTags = await 
+                    _db.Tags
+                        .OrderBy(t => t.Id)
+                        .Where(t => t.Applicable == true)
+                        .Skip(position)
+                        .Take(@params.ItemsPerPage)
+                        .ToListAsync();
+                
+                var count = await _db.Tags.Where(t => t.Applicable == true).CountAsync();
+
+                return (paginatedTags, count);
             }
             catch (Exception ex)
             {
-                return null;
+                return (null, -1);
+            }
+        }
+
+        public async Task<(List<Tag>, int)> SearchTags(PaginationParams @params, string query)
+        {
+            try
+            {
+                var position = (@params.Page - 1) * @params.ItemsPerPage;
+
+                if (query.Length < 3 || string.IsNullOrWhiteSpace(query))
+                    return (null, -1);
+
+                query = query.ToLower();
+
+                var tags = await 
+                    _db.Tags
+                    .OrderBy(t => t.Id)
+                    .Where(t => t.Applicable == true && t.Name.ToLower().Contains(query) || t.EnglishName.ToLower().Contains(query))
+                    .Skip(position)
+                    .Take(@params.ItemsPerPage)
+                    .ToListAsync(); ; // TODO
+
+                var count = await 
+                    _db.Tags
+                    .Where(t => t.Applicable == true && t.Name.ToLower().Contains(query) || t.EnglishName.ToLower().Contains(query))
+                    .CountAsync();
+
+                return (tags, count);
+            }
+            catch (Exception)
+            {
+
+                throw;
             }
         }
 

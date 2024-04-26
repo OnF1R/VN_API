@@ -44,6 +44,21 @@ namespace VN_API.Controllers
             }
         }
 
+        //[HttpGet("ParseVNDBTags")]
+        //public async Task<IActionResult> ParseVNDBTags()
+        //{
+        //    try
+        //    {
+        //        await _novelService.ParseVNDBTags();
+
+        //        return StatusCode(StatusCodes.Status200OK);
+        //    }
+        //    catch (Exception)
+        //    {
+        //        return StatusCode(StatusCodes.Status204NoContent, "Error");
+        //    }
+        //} Executed
+
         [HttpGet]
         public async Task<IActionResult> GetVisualNovels([FromQuery] PaginationParams @params)
         {

@@ -92,10 +92,10 @@ namespace VN_API.Models
         public int? ThumbnailHeight { get; set; }
     }
 
-    public class VNDBQueryResult
+    public class VNDBQueryResult<T>
     {
         public bool More { get; set; }
-        public List<VNDBResult>? Results { get; set; }
+        public List<T>? Results { get; set; }
     }
     public class VNDBResult
     {
@@ -118,7 +118,24 @@ namespace VN_API.Models
         public int? VoteCount { get; set; }
         public List<VNDBScreenshot>? Screenshots { get; set; }
         public List<VNDBDeveloper>? Developers { get; set; }
+        public List<VNDBTag>? Tags { get; set; }
 
         //Todo: Maybe add other https://api.vndb.org/kana#query-format end on relations
+    }
+
+    public class VNDBTag
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public List<string>? Aliases { get; set; }
+        public string? Description { get; set; }
+        public TagCategory? Category { get; set; }
+        public bool? Searchable { get; set; }
+        public bool? Applicable { get; set; }
+        [JsonProperty("vn_count")]
+        public int? VisualNovelCount { get; set; }
+        public float? Rating { get; set; }
+        public SpoilerLevel? Spoiler { get; set; }
+        public bool? Lie { get; set; }
     }
 }
