@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VN_API.Database;
@@ -12,9 +13,11 @@ using VN_API.Database;
 namespace VNAPI.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240602122425_AddPhotosFieldsToWorkWithS3")]
+    partial class AddPhotosFieldsToWorkWithS3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -323,7 +326,6 @@ namespace VNAPI.Migrations
                         .HasColumnType("integer");
 
                     b.Property<List<string>>("ScreenshotFileNames")
-                        .IsRequired()
                         .HasColumnType("text[]");
 
                     b.Property<int>("Status")

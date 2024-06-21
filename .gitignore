@@ -364,5 +364,7 @@ FodyWeavers.xsd
 
 #Custom
 
+vn.db
+vndb.sql
 Data/
 /GTranslatorAPI

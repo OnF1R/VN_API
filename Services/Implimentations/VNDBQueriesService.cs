@@ -138,7 +138,7 @@ namespace VN_API.Services.Implimentations
         {
             string query = 
                 "{\"filters\": [\"id\", \"=\", \"" + id + "\"], " +
-                "\"fields\": \"id, name, tags.id, tags.name, tags.category, tags.spoiler, tags.applicable\"}";
+                "\"fields\": \"id, title, tags.id, tags.spoiler\"}";
             string data = "";
             using (var client = new HttpClient())
             {

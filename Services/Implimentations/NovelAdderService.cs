@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Net;
+using Amazon.S3;
+using Amazon.S3.Transfer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -17,13 +19,14 @@ namespace VN_API.Services
         private const string VisualNovelListCacheKey = "VisualNovelList";
         private readonly ApplicationContext _db;
         private IMemoryCache _cache;
+        private IAmazonS3 _s3Client;
+        private const string bucketName = "astral-novel";
 
-
-        public NovelAdderService(ApplicationContext db, IMemoryCache cache)
+        public NovelAdderService(ApplicationContext db, IMemoryCache cache, IAmazonS3 s3Client)
         {
             _db = db;
             _cache = cache;
-
+            _s3Client = s3Client;
         }
 
         public async Task LoadVNDBRating()
@@ -141,6 +144,36 @@ namespace VN_API.Services
             } while (isMore);
 
             await _db.SaveChangesAsync();
+        }
+
+        public async Task UpdateVisualNovelTagsFromVNDB(int id)
+        {
+            var vndbService = new VNDBQueriesService();
+
+            VisualNovel visualNovel = await _db.VisualNovels.FirstAsync(vn => vn.Id == id);
+
+            if (visualNovel.VndbId != null)
+            {
+                var vndbResult = await vndbService.GetVisualNovelTags(visualNovel.VndbId.ToString());
+
+                if (vndbResult != null && vndbResult.Results != null)
+                {
+                    foreach (var tag in vndbResult.Results[0].Tags)
+                    {
+                        var tagMetadata = new TagMetadata
+                        {
+                            Id = Guid.NewGuid(),
+                            Tag = await _db.Tags.Where(t => t.VndbId == tag.Id).FirstOrDefaultAsync(),
+                            SpoilerLevel = (SpoilerLevel)tag.Spoiler,
+                            VisualNovel = visualNovel,
+                        };
+
+                        await _db.TagsMetadata.AddAsync(tagMetadata);
+                    }
+                }
+
+                await _db.SaveChangesAsync();
+            }
         }
 
         #region Visual Novel
@@ -385,7 +418,7 @@ namespace VN_API.Services
                 return null;
             }
         }
-        public async Task<VisualNovel> GetVisualNovelAsync(int id, SpoilerLevel spoilerLevel)
+        public async Task<VisualNovel> GetVisualNovelAsync(int id)
         {
             try
             {
@@ -393,8 +426,8 @@ namespace VN_API.Services
 
                 VisualNovel visualNovel = await _db.VisualNovels
                     .Include(vn => vn.Genres)
-                    .Include(vn => vn.Tags.Where(tag => tag.SpoilerLevel <= spoilerLevel))
-                        .ThenInclude(tag => tag.Tag)
+                    //.Include(vn => vn.Tags.Where(tag => tag.SpoilerLevel <= spoilerLevel))
+                    //    .ThenInclude(tag => tag.Tag)
                     .Include(vn => vn.Platforms)
                     .Include(vn => vn.Languages)
                     .Include(vn => vn.Translator)
@@ -560,7 +593,9 @@ namespace VN_API.Services
                 {
                     Title = vn.Title,
                     VndbId = vn.VndbId,
-                    CoverImagePath = null,
+
+                    //CoverImagePath = null, TODO
+
                     OriginalTitle = vn.OriginalTitle,
                     ReadingTime = vn.ReadingTime,
                     Status = vn.Status,
@@ -594,8 +629,8 @@ namespace VN_API.Services
                 foreach (var gp in gamingPlatforms)
                     AddVisualNovelToGamingPlatformAsync(gp.Id, visualNovel.Id);
 
-                foreach (var t in tags)
-                    AddTagMetadataToVisualNovelAsync(t.Tag.Id, visualNovel.Id, t.SpoilerLevel);
+                //foreach (var t in tags)
+                //    AddTagMetadataToVisualNovelAsync(t.Tag.Id, visualNovel.Id, t.SpoilerLevel);
 
                 foreach (var l in languages)
                     AddVisualNovelToLanguageAsync(l.Id, visualNovel.Id); ;
@@ -632,6 +667,9 @@ namespace VN_API.Services
 
                 await LoadOrUpdateVNDBRating(visualNovel.Id);
 
+                if (visualNovel.VndbId != null)
+                    await UpdateVisualNovelTagsFromVNDB(visualNovel.Id);
+
                 return await _db.VisualNovels.FindAsync(visualNovel.Id);
             }
             catch (Exception ex)
@@ -646,11 +684,15 @@ namespace VN_API.Services
         {
             try
             {
-                ImageType type;
+                int indexLastDot = coverImage.FileName.LastIndexOf('.');
 
-                string directory = $"C:\\Users\\Oleg\\source\\repos\\VN_API\\Data\\VisualNovels\\{id}\\CoverImage\\";
+                int fileExtensionsNameLength = coverImage.FileName.Length - indexLastDot;
 
-                DirectoryInfo directoryInfo = new DirectoryInfo(directory);
+                string fileExtensionName = coverImage.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
+
+                string pathToLoad = $"{id}/CoverImage";
+
+                string fileName = $"{id}.{fileExtensionName}";
 
                 var vn = await _db.VisualNovels.FindAsync(id);
 
@@ -659,30 +701,11 @@ namespace VN_API.Services
                     return null;
                 }
 
-                using (MemoryStream ms = new MemoryStream())
-                {
-                    coverImage.CopyTo(ms);
-                    var byteImage = ms.ToArray();
+                //TODO Send file to S3
 
-                    type = ImageFormat.GetImageFormat(byteImage);
+                await LoadToS3(coverImage, pathToLoad, fileName);
 
-                    if (!Directory.Exists(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
-
-                    if (Directory.GetFiles(directory).Length > 0)
-                    {
-                        foreach (FileInfo file in directoryInfo.GetFiles())
-                        {
-                            file.Delete();
-                        }
-                    }
-
-                    vn.CoverImagePath = directory + $"{id}.{type}";
-
-                    File.WriteAllBytes(directory + $"{id}.{type}", byteImage);
-                }
+                vn.CoverImageFileName = fileName;
 
                 _db.Entry(vn).State = EntityState.Modified;
 
@@ -700,11 +723,15 @@ namespace VN_API.Services
         {
             try
             {
-                ImageType type;
+                int indexLastDot = coverImage.FileName.LastIndexOf('.');
 
-                string directory = $"C:\\Users\\Oleg\\source\\repos\\VN_API\\Data\\VisualNovels\\{id}\\BackgroundImage\\";
+                int fileExtensionsNameLength = coverImage.FileName.Length - indexLastDot;
 
-                DirectoryInfo directoryInfo = new DirectoryInfo(directory);
+                string fileExtensionName = coverImage.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
+
+                string pathToLoad = $"{id}/BackgroundImage";
+
+                string fileName = $"{id}.{fileExtensionName}";
 
                 var vn = await _db.VisualNovels.FindAsync(id);
 
@@ -713,29 +740,52 @@ namespace VN_API.Services
                     return null;
                 }
 
-                using (MemoryStream ms = new MemoryStream())
+                await LoadToS3(coverImage, pathToLoad, fileName);
+
+                vn.BackgroundImageFileName = fileName;
+
+                _db.Entry(vn).State = EntityState.Modified;
+
+                await _db.SaveChangesAsync();
+
+                return vn;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        public async Task<VisualNovel> AddScreenshotsToVisualNovel(int id, List<IFormFile> screenshots)
+        {
+            try
+            {
+                var vn = await _db.VisualNovels.FindAsync(id);
+
+                if (vn == null)
                 {
-                    coverImage.CopyTo(ms);
-                    var byteImage = ms.ToArray();
+                    return null;
+                }
 
-                    type = ImageFormat.GetImageFormat(byteImage);
+                foreach (var iformfile in screenshots)
+                {
+                    int indexLastDot = iformfile.FileName.LastIndexOf('.');
 
-                    if (!Directory.Exists(directory))
-                    {
-                        Directory.CreateDirectory(directory);
-                    }
+                    int fileExtensionsNameLength = iformfile.FileName.Length - indexLastDot;
 
-                    if (Directory.GetFiles(directory).Length > 0)
-                    {
-                        foreach (FileInfo file in directoryInfo.GetFiles())
-                        {
-                            file.Delete();
-                        }
-                    }
+                    string fileExtensionName = iformfile.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
 
-                    //vn.CoverImagePath = directory + $"{id}.{type}";
+                    string pathToLoad = $"{id}/Screenshots";
 
-                    File.WriteAllBytes(directory + $"{id}.{type}", byteImage);
+                    string fileName = $"{Guid.NewGuid()}.{fileExtensionName}";
+
+                    await LoadToS3(iformfile, pathToLoad, fileName);
+
+                    vn.ScreenshotFileNames.Add(fileName);
+
+                    _db.Entry(vn).State = EntityState.Modified;
+
+                    await _db.SaveChangesAsync();
                 }
 
                 //_db.Entry(vn).State = EntityState.Modified;
@@ -750,60 +800,24 @@ namespace VN_API.Services
             }
         }
 
-        public async Task<VisualNovel> AddScreenshotsToVisualNovel(int id, List<IFormFile> screenshots)
+        public async Task LoadToS3(IFormFile file, string path, string fileName)
         {
-            try
+            var fileTransferUtility = new TransferUtility(_s3Client);
+
+            using (var newMemoryStream = new MemoryStream())
             {
-                string directory = $"C:\\Users\\Oleg\\source\\repos\\VN_API\\Data\\VisualNovels\\{id}\\Screenshots\\";
+                await file.CopyToAsync(newMemoryStream);
 
-                DirectoryInfo directoryInfo = new DirectoryInfo(directory);
-
-                var vn = await _db.VisualNovels.FindAsync(id);
-
-                if (vn == null)
+                var uploadRequest = new TransferUtilityUploadRequest
                 {
-                    return null;
-                }
+                    InputStream = newMemoryStream,
+                    Key = $"{path}/{fileName}",
+                    BucketName = bucketName,
+                    ContentType = file.ContentType,
+                    CannedACL = S3CannedACL.PublicRead // Доступ к файлу публичный
+                };
 
-                foreach (var iformfile in screenshots)
-                {
-                    ImageType type;
-
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        iformfile.CopyTo(ms);
-                        var byteImage = ms.ToArray();
-
-                        type = ImageFormat.GetImageFormat(byteImage);
-
-                        if (!Directory.Exists(directory))
-                        {
-                            Directory.CreateDirectory(directory);
-                        }
-
-                        //if (Directory.GetFiles(directory).Length > 0)
-                        //{
-                        //    foreach (FileInfo file in directoryInfo.GetFiles())
-                        //    {
-                        //        file.Delete();
-                        //    }
-                        //}
-
-                        //vn.CoverImagePath = directory + $"{id}.{type}";
-
-                        File.WriteAllBytes(directory + $"{Guid.NewGuid()}.{type}", byteImage);
-                    }
-                }
-
-                //_db.Entry(vn).State = EntityState.Modified;
-
-                //await _db.SaveChangesAsync();
-
-                return vn;
-            }
-            catch (Exception ex)
-            {
-                return null;
+                await fileTransferUtility.UploadAsync(uploadRequest);
             }
         }
 
@@ -1476,6 +1490,41 @@ namespace VN_API.Services
 
         #region Tag
 
+        public async Task<List<Tag>> GetAllTagsAsync()
+        {
+            try
+            {
+                var tags = await _db.Tags.Where(t => t.Applicable == true).ToListAsync(); ;
+
+                var listTags = tags
+                    .OrderBy(t =>
+                    {
+                        if ((t.Name[0] >= 'а' && t.Name[0] <= 'я') || (t.Name[0] >= 'А' && t.Name[0] <= 'Я'))
+                        {
+                            return 0;
+                        }
+                        else if ((t.Name[0] >= 'a' && t.Name[0] <= 'z') || (t.Name[0] >= 'A' && t.Name[0] <= 'Z'))
+                        {
+                            return 1;
+                        }
+                        else if (char.IsDigit(t.Name[0]))
+                        {
+                            return 2;
+                        }
+                        else
+                        {
+                            return 3;
+                        }
+                    }).ThenBy(t => t.Name).ToList();
+
+                return listTags;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
         public async Task<(List<Tag>, int)> GetTagsAsync(PaginationParams @params)
         {
             try
@@ -1637,11 +1686,17 @@ namespace VN_API.Services
                 return null;
             }
         }
-        public async Task<List<TagMetadata>> GetVisualNovelTagsMetadataAsync(int visualNovelId)
+        public async Task<List<TagMetadata>> GetVisualNovelTagsMetadataAsync(int visualNovelId, SpoilerLevel spoilerLevel)
         {
             try
             {
-                return await _db.TagsMetadata.Where(tag => tag.VisualNovel.Id == visualNovelId).ToListAsync();
+                var tags = await _db.TagsMetadata
+                    .Include(t => t.Tag)
+                    .Where(t => t.VisualNovel.Id == visualNovelId)
+                    .Where(t => t.SpoilerLevel <= spoilerLevel)
+                    .ToListAsync();
+
+                return tags;
             }
             catch (Exception ex)
             {

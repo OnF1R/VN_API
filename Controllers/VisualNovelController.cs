@@ -44,6 +44,21 @@ namespace VN_API.Controllers
             }
         }
 
+        [HttpGet("UpdateVisualNovelTagsFromVNDB")]
+        public async Task<IActionResult> UpdateVisualNovelTags(int id)
+        {
+            try
+            {
+                await _novelService.UpdateVisualNovelTagsFromVNDB(id);
+                return StatusCode(StatusCodes.Status200OK);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status204NoContent, "Error");
+                //throw;
+            }
+        }
+
         //[HttpGet("ParseVNDBTags")]
         //public async Task<IActionResult> ParseVNDBTags()
         //{
@@ -149,9 +164,9 @@ namespace VN_API.Controllers
         
 
         [HttpGet("id")]
-        public async Task<IActionResult> GetVisualNovel(int id, SpoilerLevel spoilerLevel)
+        public async Task<IActionResult> GetVisualNovel(int id)
         {
-            VisualNovel vn = await _novelService.GetVisualNovelAsync(id, spoilerLevel);
+            VisualNovel vn = await _novelService.GetVisualNovelAsync(id);
 
             if (vn == null)
             {

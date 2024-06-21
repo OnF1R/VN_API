@@ -9,9 +9,13 @@
       "secretStore": "LocalSecretsFile",
       "containerName": "postgresql",
       "containerImage": "postgres",
+      "resourceId": null,
       "type": "postgresql.container",
-      "connectionId": "DefaultConnection",
-      "dynamicId": null
+      "connectionId": "ConnectionStrings:DefaultConnectrion"
+    },
+    "mssql1": {
+      "ignored": "true",
+      "type": "mssql"
     }
   }
 }

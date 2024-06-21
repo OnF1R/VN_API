@@ -42,9 +42,9 @@ namespace VN_API.Controllers
         }
 
         [HttpGet("visualNovelId")]
-        public async Task<IActionResult> GetVisualNovelTagsMetadataAsync(int visualNovelId)
+        public async Task<IActionResult> GetVisualNovelTagsMetadataAsync(int visualNovelId, SpoilerLevel spoilerLevel)
         {
-            var tagsMetadata = await _novelService.GetTagMetadataAsync(visualNovelId);
+            var tagsMetadata = await _novelService.GetVisualNovelTagsMetadataAsync(visualNovelId, spoilerLevel);
 
             if (tagsMetadata == null)
             {

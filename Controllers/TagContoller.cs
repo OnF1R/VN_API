@@ -1,4 +1,8 @@
+using GTranslatorAPI;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using System;
 using System.Net;
 using System.Text.Json;
 using VN_API.Models;
@@ -12,10 +16,12 @@ namespace VN_API.Controllers
     public class TagController : ControllerBase
     {
         private readonly INovelService _novelService;
+        private readonly IMemoryCache _cache;
 
-        public TagController(INovelService novelService)
+        public TagController(INovelService novelService, IMemoryCache cache)
         {
-            _novelService = novelService;
+            _novelService = novelService ?? throw new ArgumentNullException(nameof(novelService));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         [HttpGet]
@@ -33,6 +39,31 @@ namespace VN_API.Controllers
             }
 
             return StatusCode(StatusCodes.Status200OK, tags.Item1);
+        }
+
+        [HttpGet("All")]
+        public async Task<IActionResult> GetAllTags()
+        {
+            string cacheKey = "allTags";
+
+            var cacheOptions = new MemoryCacheEntryOptions()
+                .SetSlidingExpiration(TimeSpan.FromDays(30))
+                .SetAbsoluteExpiration(TimeSpan.FromDays(90)); //Tags are so rarely changed
+
+            if (_cache.TryGetValue(cacheKey, out List<Tag> tags)) { }
+            else
+            {
+                tags = await _novelService.GetAllTagsAsync();
+            }
+
+            if (tags == null)
+            {
+                return StatusCode(StatusCodes.Status204NoContent, "No Tags in database");
+            }
+
+            _cache.Set(cacheKey, tags, cacheOptions);
+
+            return StatusCode(StatusCodes.Status200OK, tags);
         }
 
         [HttpGet("Search")]

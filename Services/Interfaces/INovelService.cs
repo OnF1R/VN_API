@@ -8,8 +8,8 @@ namespace VN_API.Services.Interfaces
     {
         Task LoadVNDBRating();
         Task LoadOrUpdateVNDBRating(int id);
-
         Task ParseVNDBTags();
+        Task UpdateVisualNovelTagsFromVNDB(int id);
         // Visual Novel Service 
         /// <summary>
         /// Get Visual Novel From Database using pagination options
@@ -37,7 +37,7 @@ namespace VN_API.Services.Interfaces
         /// <param name="id">The Visual Novel ID corresponding to the record in the database</param>
         /// <param name="spoilerLevel">The Spoiler Level enum value</param>
         /// <returns>VisualNovel if a match was found, otherwise null</returns>
-        Task<VisualNovel> GetVisualNovelAsync(int id, SpoilerLevel spoilerLevel = SpoilerLevel.None);
+        Task<VisualNovel> GetVisualNovelAsync(int id);
         /// <summary>
         /// Get Visual Novel Cover Image From Folder by identifier
         /// </summary>
@@ -165,6 +165,7 @@ namespace VN_API.Services.Interfaces
         Task<(bool, string)> DeleteGenreAsync(Genre genre);
 
         // Tag Novel Service 
+        Task<List<Tag>> GetAllTagsAsync();
         Task<(List<Tag>, int)> GetTagsAsync(PaginationParams @params);
         Task<(List<Tag>, int)> SearchTags(PaginationParams @params, string query);
         Task<Tag> GetTagAsync(int id);
@@ -177,7 +178,7 @@ namespace VN_API.Services.Interfaces
         // TagMetadata Novel Service 
         Task<TagMetadata> GetTagMetadata(Guid id);
         Task<List<TagMetadata>> GetTagMetadataAsync(int tagId);
-        Task<List<TagMetadata>> GetVisualNovelTagsMetadataAsync(int visualNovelId);
+        Task<List<TagMetadata>> GetVisualNovelTagsMetadataAsync(int visualNovelId, SpoilerLevel spoilerLevel);
         Task<TagMetadata> AddTagMetadataAsync(int tagId, int visualNovelId, SpoilerLevel spoilerLevel);
         Task<TagMetadata> UpdateTagMetadataAsync(Guid id, int tagId, int visualNovelId, SpoilerLevel spoilerLevel);
         void AddTagMetadataToVisualNovelAsync(int tagId, int vnId, SpoilerLevel spoilerLevel);

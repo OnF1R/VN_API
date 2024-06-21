@@ -8,7 +8,9 @@ namespace VN_API.Models
         public string? VndbId { get; set; }
         public string Title { get; set; }
         public string? OriginalTitle { get; set; }
-        public string? CoverImagePath { get; set; } = null;
+        public string? CoverImageFileName { get; set; }
+        public string? BackgroundImageFileName { get; set; }
+        public List<string> ScreenshotFileNames { get; set; }
         public Status Status { get; set; }
         //public int PageViewesCount { get; set; }
         //public int CommentsCount { get; set; }

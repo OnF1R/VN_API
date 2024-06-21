@@ -20,12 +20,12 @@ namespace VN_API.Database
         public ApplicationContext(DbContextOptions<ApplicationContext> options) : base(options)
         {
             //Database.EnsureDeleted();
-            Database.EnsureCreated();
+            //Database.EnsureCreated();
         }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseNpgsql("Server=localhost;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;");
+            //optionsBuilder.UseNpgsql("Server=localhost;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;");
             //optionsBuilder.UseSqlite("Data Source=vn.db");
             //optionsBuilder.UseLazyLoadingProxies();
         }
