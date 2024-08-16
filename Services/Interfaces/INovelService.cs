@@ -6,16 +6,19 @@ namespace VN_API.Services.Interfaces
 {
     public interface INovelService
     {
+        Task<bool> IncrementPageViewsCount(int visualNovelId);
         Task LoadVNDBRating();
         Task LoadOrUpdateVNDBRating(int id);
         Task ParseVNDBTags();
         Task UpdateVisualNovelTagsFromVNDB(int id);
+        Task UpdateVisualNovelLinkName(int id, string linkName);
         // Visual Novel Service 
         /// <summary>
         /// Get Visual Novel From Database using pagination options
         /// </summary>
         /// <param name="params">PaginationParams Model</param>
         /// <returns>List<VisualNovel> if there are one or more matches, otherwise null</returns>
+        Task<VisualNovel> GetRandomVisualNovel();
         Task<List<VisualNovel>> GetVisualNovelsAsync(PaginationParams @params);
         Task<List<VisualNovelWithRating>> GetVisualNovelsWithRatingAsync(PaginationParams @params);
         Task<List<VisualNovelWithRating>> GetFiltredVisualNovelsWithRatingAsync
@@ -27,17 +30,23 @@ namespace VN_API.Services.Interfaces
                 List<int> platforms,
                 SpoilerLevel spoilerLevel,
                 ReadingTime readingTime,
-                Sort sort
+                Sort sort,
+                string search
                 //List<int> authors
                 //List<int> translators
             );
         /// <summary>
-        /// Get Visual Novel From Database by identifier with tags Spoiler Level
+        /// Get Visual Novel From Database by identifier
         /// </summary>
         /// <param name="id">The Visual Novel ID corresponding to the record in the database</param>
-        /// <param name="spoilerLevel">The Spoiler Level enum value</param>
         /// <returns>VisualNovel if a match was found, otherwise null</returns>
         Task<VisualNovel> GetVisualNovelAsync(int id);
+        /// <summary>
+        /// Get Visual Novel From Database by link name
+        /// </summary>
+        /// <param name="id">The Visual Novel ID corresponding to the record in the database</param>
+        /// <returns>VisualNovel if a match was found, otherwise null</returns>
+        Task<VisualNovel> GetVisualNovelAsync(string linkName);
         /// <summary>
         /// Get Visual Novel Cover Image From Folder by identifier
         /// </summary>
@@ -68,6 +77,12 @@ namespace VN_API.Services.Interfaces
         /// <param name="visualNovel">VisualNovel Model</param>
         /// <returns>Visual Novel if Visual Novel was added to database, otherwise null</returns>
         Task<VisualNovel> AddVisualNovelAsync(VisualNovel visualNovel);
+        /// <summary>
+        /// Add Visual Novel To Database
+        /// </summary>
+        /// <param name="visualNovel">VisualNovel Model</param>
+        /// <returns>Visual Novel if Visual Novel was added to database, otherwise null</returns>
+        Task<VisualNovel> AddVisualNovelFromJsonAsync(VisualNovel visualNovel);
         /// <summary>
         /// Add Path to Visual Novel Cover Image in Server Data Storage and Column in Database
         /// </summary>
@@ -197,9 +212,12 @@ namespace VN_API.Services.Interfaces
         // Rating Novel Service
         Task<List<VisualNovelRating>> GetVisualNovelRatingsAsync();
         Task<VisualNovelRating> GetVisualNovelRatingAsync(Guid id);
+        Task<int> GetVisualNovelUserRatingAsync(Guid userId, int visualNovelId);
         Task<List<VisualNovelRating>> GetVisualNovelRatingByVisualNovelIdAsync(int vnId);
         Task<(double, int)> GetVisualNovelAverageRatingWithCount(int vnId);
         Task<VisualNovelRating> AddVisualNovelRatingAsync(VisualNovelRating vnRating);
+        Task<VisualNovelRating> UpdateRatingByUserAsync(Guid userId, int visualNovelId, int rating);
+        Task<(bool, string)> RemoveRatingByUserAsync(Guid userId, int visualNovelId);
         Task<VisualNovelRating> UpdateVisualNovelRatingAsync(Guid id, int vnRating);
         Task<(bool, string)> DeleteVisualNovelRatingAsync(VisualNovelRating vnRating);
 
@@ -238,5 +256,22 @@ namespace VN_API.Services.Interfaces
         Task DeleteOtherLinksToVisualNovelAsync(Guid otherLinkId, int vnId);
         Task<OtherLink> UpdateOtherLink(Guid otherLinkId, OtherLink otherLink);
         Task<(bool, string)> DeleteOtherLink(OtherLink otherLink);
+
+        // Visual Novel List Service
+        Task<VisualNovelList> GetVisualNovelList(int listId);
+        Task<List<VisualNovelList>> GetVisualNovelLists(string userId, bool showPrivate);
+        Task<List<VisualNovelListEntry>> GetUserVisualNovelsInLists(string userId, bool showPrivate);
+        Task<List<VisualNovelListEntry>> GetVisualNovelsInList(string userId, int listId);
+        Task<List<VisualNovelListEntry>> GetVisualNovelInAnyUserList(string userId, int visualNovelId);
+        Task<VisualNovelList> UpdateVisualNovelList(string userId, int listId, VisualNovelList visualNovelList);
+        Task<(bool, string)> CreateBaseLists(string userId);
+        Task<VisualNovelList> CreateCustomList(string userId, VisualNovelList visualNovelList);
+        Task<(bool, string)> AddToList(string userId, int listId, int visualNovelId);
+        Task<(bool, string)> RemoveFromList(string userId, int listId, int visualNovelId);
+        Task<(bool, string)> DeleteList(string userId, int listId);
+        Task<VisualNovelListType> AddListType(string name, bool isMutuallyExclusive);
+
+        Task DeleteFromS3(string path);
+        Task DeleteScreenshotsFolderS3(int vnId);
     }
 }

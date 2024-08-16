@@ -23,7 +23,7 @@ namespace VN_API.Controllers
 
             if (translators == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Translators in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, translators);
@@ -36,7 +36,7 @@ namespace VN_API.Controllers
 
             if (translator == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Translator found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, translator);

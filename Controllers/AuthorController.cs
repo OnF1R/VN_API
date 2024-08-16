@@ -23,7 +23,7 @@ namespace VN_API.Controllers
 
             if (authors == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Authors in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, authors);
@@ -36,7 +36,7 @@ namespace VN_API.Controllers
 
             if (author == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Author found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, author);

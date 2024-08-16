@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VN_API.Database;
@@ -12,9 +13,11 @@ using VN_API.Database;
 namespace VNAPI.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240710141030_RemoveRelatedNovels")]
+    partial class RemoveRelatedNovels
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -327,21 +330,6 @@ namespace VNAPI.Migrations
                     b.ToTable("AnimeLinks");
                 });
 
-            modelBuilder.Entity("VN_API.Models.RelatedNovel", b =>
-                {
-                    b.Property<int>("VisualNovelId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RelatedVisualNovelId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("VisualNovelId", "RelatedVisualNovelId");
-
-                    b.HasIndex("RelatedVisualNovelId");
-
-                    b.ToTable("RelatedNovels");
-                });
-
             modelBuilder.Entity("VN_API.Models.Tag", b =>
                 {
                     b.Property<int>("Id")
@@ -468,16 +456,6 @@ namespace VNAPI.Migrations
                     b.Property<int>("ReadingTime")
                         .HasColumnType("integer");
 
-                    b.Property<DateOnly?>("ReleaseDate")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("date");
-
-                    b.Property<int?>("ReleaseDay")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ReleaseMonth")
-                        .HasColumnType("integer");
-
                     b.Property<int?>("ReleaseYear")
                         .HasColumnType("integer");
 
@@ -517,8 +495,7 @@ namespace VNAPI.Migrations
                     b.HasIndex("Id")
                         .IsUnique();
 
-                    b.HasIndex("LinkName")
-                        .IsUnique();
+                    b.HasIndex("LinkName");
 
                     b.HasIndex("Title");
 
@@ -598,9 +575,6 @@ namespace VNAPI.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsMutuallyExclusive")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -751,25 +725,6 @@ namespace VNAPI.Migrations
                     b.Navigation("VisualNovel");
                 });
 
-            modelBuilder.Entity("VN_API.Models.RelatedNovel", b =>
-                {
-                    b.HasOne("VN_API.Models.VisualNovel", "RelatedVisualNovel")
-                        .WithMany()
-                        .HasForeignKey("RelatedVisualNovelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
-                        .WithMany("RelatedNovels")
-                        .HasForeignKey("VisualNovelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("RelatedVisualNovel");
-
-                    b.Navigation("VisualNovel");
-                });
-
             modelBuilder.Entity("VN_API.Models.TagMetadata", b =>
                 {
                     b.HasOne("VN_API.Models.Tag", "Tag")
@@ -822,8 +777,6 @@ namespace VNAPI.Migrations
                     b.Navigation("DownloadLinks");
 
                     b.Navigation("OtherLinks");
-
-                    b.Navigation("RelatedNovels");
 
                     b.Navigation("Tags");
                 });

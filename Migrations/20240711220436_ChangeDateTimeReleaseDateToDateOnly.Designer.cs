@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VN_API.Database;
@@ -12,9 +13,11 @@ using VN_API.Database;
 namespace VNAPI.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240711220436_ChangeDateTimeReleaseDateToDateOnly")]
+    partial class ChangeDateTimeReleaseDateToDateOnly
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -470,7 +473,8 @@ namespace VNAPI.Migrations
 
                     b.Property<DateOnly?>("ReleaseDate")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("date");
+                        .HasColumnType("date")
+                        .HasComputedColumnSql("CASE WHEN \"ReleaseYear\" IS NOT NULL THEN MAKE_DATE(\"ReleaseYear\", COALESCE(\"ReleaseMonth\", 1), COALESCE(\"ReleaseDay\", 1)) ELSE NULL END", true);
 
                     b.Property<int?>("ReleaseDay")
                         .HasColumnType("integer");
@@ -598,9 +602,6 @@ namespace VNAPI.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsMutuallyExclusive")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()

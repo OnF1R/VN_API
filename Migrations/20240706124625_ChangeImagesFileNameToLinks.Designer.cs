@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using VN_API.Database;
@@ -12,9 +13,11 @@ using VN_API.Database;
 namespace VNAPI.Migrations
 {
     [DbContext(typeof(ApplicationContext))]
-    partial class ApplicationContextModelSnapshot : ModelSnapshot
+    [Migration("20240706124625_ChangeImagesFileNameToLinks")]
+    partial class ChangeImagesFileNameToLinks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -83,21 +86,6 @@ namespace VNAPI.Migrations
                     b.ToTable("LanguageVisualNovel");
                 });
 
-            modelBuilder.Entity("TranslatorVisualNovel", b =>
-                {
-                    b.Property<int>("TranslatorId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("VisualNovelsId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("TranslatorId", "VisualNovelsId");
-
-                    b.HasIndex("VisualNovelsId");
-
-                    b.ToTable("TranslatorVisualNovel");
-                });
-
             modelBuilder.Entity("VN_API.Models.Author", b =>
                 {
                     b.Property<int>("Id")
@@ -122,76 +110,6 @@ namespace VNAPI.Migrations
                         .IsUnique();
 
                     b.ToTable("Authors");
-                });
-
-            modelBuilder.Entity("VN_API.Models.Comment.VisualNovelComment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsUpdated")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("ParentCommentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("PostedDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("VisualNovelId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Id")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("VisualNovelId");
-
-                    b.ToTable("Comments");
-                });
-
-            modelBuilder.Entity("VN_API.Models.Comment.VisualNovelCommentRating", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AddedDate")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<Guid>("CommentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsLike")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CommentId");
-
-                    b.HasIndex("Id")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("CommentRatings");
                 });
 
             modelBuilder.Entity("VN_API.Models.DownloadLink", b =>
@@ -300,48 +218,6 @@ namespace VNAPI.Migrations
                     b.ToTable("OtherLinks");
                 });
 
-            modelBuilder.Entity("VN_API.Models.RelatedAnimeLink", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Url")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int?>("VisualNovelId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Id")
-                        .IsUnique();
-
-                    b.HasIndex("VisualNovelId");
-
-                    b.ToTable("AnimeLinks");
-                });
-
-            modelBuilder.Entity("VN_API.Models.RelatedNovel", b =>
-                {
-                    b.Property<int>("VisualNovelId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RelatedVisualNovelId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("VisualNovelId", "RelatedVisualNovelId");
-
-                    b.HasIndex("RelatedVisualNovelId");
-
-                    b.ToTable("RelatedNovels");
-                });
-
             modelBuilder.Entity("VN_API.Models.Tag", b =>
                 {
                     b.Property<int>("Id")
@@ -436,14 +312,8 @@ namespace VNAPI.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<List<string>>("AnotherTitles")
-                        .HasColumnType("text[]");
-
                     b.Property<string>("BackgroundImageLink")
                         .HasColumnType("text");
-
-                    b.Property<int>("CommentsCount")
-                        .HasColumnType("integer");
 
                     b.Property<string>("CoverImageLink")
                         .HasColumnType("text");
@@ -458,34 +328,18 @@ namespace VNAPI.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("LinkName")
-                        .IsRequired()
+                    b.Property<string>("OriginalTitle")
                         .HasColumnType("text");
 
-                    b.Property<int>("PageViewesCount")
-                        .HasColumnType("integer");
-
                     b.Property<int>("ReadingTime")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly?>("ReleaseDate")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("date");
-
-                    b.Property<int?>("ReleaseDay")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ReleaseMonth")
                         .HasColumnType("integer");
 
                     b.Property<int?>("ReleaseYear")
                         .HasColumnType("integer");
 
                     b.Property<List<string>>("ScreenshotLinks")
+                        .IsRequired()
                         .HasColumnType("text[]");
-
-                    b.Property<string>("SoundtrackYoutubePlaylistLink")
-                        .HasColumnType("text");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -499,6 +353,9 @@ namespace VNAPI.Migrations
 
                     b.Property<string>("TranslateLinkForSteam")
                         .HasColumnType("text");
+
+                    b.Property<int?>("TranslatorId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("VndbId")
                         .HasColumnType("text");
@@ -517,10 +374,11 @@ namespace VNAPI.Migrations
                     b.HasIndex("Id")
                         .IsUnique();
 
-                    b.HasIndex("LinkName")
-                        .IsUnique();
+                    b.HasIndex("OriginalTitle");
 
                     b.HasIndex("Title");
+
+                    b.HasIndex("TranslatorId");
 
                     b.ToTable("VisualNovels");
                 });
@@ -598,9 +456,6 @@ namespace VNAPI.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsMutuallyExclusive")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -701,21 +556,6 @@ namespace VNAPI.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("TranslatorVisualNovel", b =>
-                {
-                    b.HasOne("VN_API.Models.Translator", null)
-                        .WithMany()
-                        .HasForeignKey("TranslatorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("VN_API.Models.VisualNovel", null)
-                        .WithMany()
-                        .HasForeignKey("VisualNovelsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("VN_API.Models.DownloadLink", b =>
                 {
                     b.HasOne("VN_API.Models.GamingPlatform", "GamingPlatform")
@@ -725,7 +565,7 @@ namespace VNAPI.Migrations
                         .IsRequired();
 
                     b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
-                        .WithMany("DownloadLinks")
+                        .WithMany("Links")
                         .HasForeignKey("VisualNovelId");
 
                     b.Navigation("GamingPlatform");
@@ -738,34 +578,6 @@ namespace VNAPI.Migrations
                     b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
                         .WithMany("OtherLinks")
                         .HasForeignKey("VisualNovelId");
-
-                    b.Navigation("VisualNovel");
-                });
-
-            modelBuilder.Entity("VN_API.Models.RelatedAnimeLink", b =>
-                {
-                    b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
-                        .WithMany("AnimeLinks")
-                        .HasForeignKey("VisualNovelId");
-
-                    b.Navigation("VisualNovel");
-                });
-
-            modelBuilder.Entity("VN_API.Models.RelatedNovel", b =>
-                {
-                    b.HasOne("VN_API.Models.VisualNovel", "RelatedVisualNovel")
-                        .WithMany()
-                        .HasForeignKey("RelatedVisualNovelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VN_API.Models.VisualNovel", "VisualNovel")
-                        .WithMany("RelatedNovels")
-                        .HasForeignKey("VisualNovelId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("RelatedVisualNovel");
 
                     b.Navigation("VisualNovel");
                 });
@@ -785,6 +597,15 @@ namespace VNAPI.Migrations
                     b.Navigation("Tag");
 
                     b.Navigation("VisualNovel");
+                });
+
+            modelBuilder.Entity("VN_API.Models.VisualNovel", b =>
+                {
+                    b.HasOne("VN_API.Models.Translator", "Translator")
+                        .WithMany("VisualNovels")
+                        .HasForeignKey("TranslatorId");
+
+                    b.Navigation("Translator");
                 });
 
             modelBuilder.Entity("VN_API.Models.VisualNovelList", b =>
@@ -815,15 +636,16 @@ namespace VNAPI.Migrations
                     b.Navigation("VisualNovelList");
                 });
 
+            modelBuilder.Entity("VN_API.Models.Translator", b =>
+                {
+                    b.Navigation("VisualNovels");
+                });
+
             modelBuilder.Entity("VN_API.Models.VisualNovel", b =>
                 {
-                    b.Navigation("AnimeLinks");
-
-                    b.Navigation("DownloadLinks");
+                    b.Navigation("Links");
 
                     b.Navigation("OtherLinks");
-
-                    b.Navigation("RelatedNovels");
 
                     b.Navigation("Tags");
                 });

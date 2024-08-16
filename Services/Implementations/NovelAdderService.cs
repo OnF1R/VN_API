@@ -1,12 +1,9 @@
-﻿using System;
-using System.Net;
-using Amazon.S3;
-using Amazon.S3.Transfer;
+﻿using Ganss.Xss;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.IO;
 using VN_API.Database;
-using VN_API.Extensions;
 using VN_API.Models;
 using VN_API.Models.Pagination;
 using VN_API.Services.Implimentations;
@@ -19,14 +16,62 @@ namespace VN_API.Services
         private const string VisualNovelListCacheKey = "VisualNovelList";
         private readonly ApplicationContext _db;
         private IMemoryCache _cache;
-        private IAmazonS3 _s3Client;
+        private Amazon.S3.IAmazonS3 _s3Client;
         private const string bucketName = "astral-novel";
+        private const string _s3Url = "https://2f58d602-2c33-481e-875b-700b4d4b3263.selstorage.ru/";
 
-        public NovelAdderService(ApplicationContext db, IMemoryCache cache, IAmazonS3 s3Client)
+        public NovelAdderService(ApplicationContext db, IMemoryCache cache, Amazon.S3.IAmazonS3 s3Client)
         {
             _db = db;
             _cache = cache;
             _s3Client = s3Client;
+        }
+
+        public async Task<bool> IncrementPageViewsCount(int visualNovelId)
+        {
+            try
+            {
+                var vn = await _db.VisualNovels.FindAsync(visualNovelId);
+
+                if (vn == null)
+                {
+                    return false;
+                }
+
+                vn.PageViewesCount++;
+
+                await _db.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+                throw;
+            }
+        }
+
+        public async Task<VisualNovel> GetRandomVisualNovel()
+        {
+            try
+            {
+                int count = await _db.VisualNovels.CountAsync();
+                int index = new Random().Next(count);
+
+                var novel = await _db.VisualNovels.Skip(index).FirstOrDefaultAsync();
+
+                if (novel == null)
+                {
+                    return null;
+                }
+
+                return novel;
+            }
+            catch (Exception)
+            {
+                return null;
+                throw;
+            }
         }
 
         public async Task LoadVNDBRating()
@@ -115,6 +160,8 @@ namespace VN_API.Services
             bool isMore = false;
             string currentTagId = "";
 
+            //TODO Not Add The Same
+
             do
             {
                 var tagsData = await vndbService.GetTags(currentTagId, isMore);
@@ -150,11 +197,14 @@ namespace VN_API.Services
         {
             var vndbService = new VNDBQueriesService();
 
-            VisualNovel visualNovel = await _db.VisualNovels.FirstAsync(vn => vn.Id == id);
+            VisualNovel visualNovel = await _db.VisualNovels.Include(vn => vn.Tags).FirstAsync(vn => vn.Id == id);
 
             if (visualNovel.VndbId != null)
             {
                 var vndbResult = await vndbService.GetVisualNovelTags(visualNovel.VndbId.ToString());
+
+                if (visualNovel.Tags != null)
+                    visualNovel.Tags.Clear();
 
                 if (vndbResult != null && vndbResult.Results != null)
                 {
@@ -167,6 +217,9 @@ namespace VN_API.Services
                             SpoilerLevel = (SpoilerLevel)tag.Spoiler,
                             VisualNovel = visualNovel,
                         };
+
+                        if (tagMetadata.Tag == null)
+                            continue;
 
                         await _db.TagsMetadata.AddAsync(tagMetadata);
                     }
@@ -253,21 +306,15 @@ namespace VN_API.Services
                 List<int> platforms,
                 SpoilerLevel spoilerLevel,
                 ReadingTime readingTime,
-                Sort sort
+                Sort sort,
+                string search
             )
         {
             try
             {
-                //var cacheOptions = new MemoryCacheEntryOptions()
-                //.SetSlidingExpiration(TimeSpan.FromSeconds(180))
-                //.SetAbsoluteExpiration(TimeSpan.FromSeconds(3600));
-
-                //if (_cache.TryGetValue(VisualNovelListCacheKey + $"_page_filtred_with_rating_{@params.Page}", out List<VisualNovelWithRating> visualNovels))
-                //    return visualNovels;
-
                 List<VisualNovelWithRating> visualNovels;
 
-                var vns = _db.VisualNovels.AsQueryable();
+                var vns = _db.VisualNovels.AsQueryable().AsNoTracking();
 
                 if (readingTime != ReadingTime.Any)
                     vns = vns.Where(vn => vn.ReadingTime == readingTime);
@@ -325,6 +372,14 @@ namespace VN_API.Services
                 {
                     vns = vns.Where(vn => !vn.Platforms.Any(p => excludedPlatforms.Contains(p.Id)));
                 }
+
+                if (!string.IsNullOrEmpty(search))
+                {
+                    string searchLowerCase = search.ToLower();
+
+                    vns = vns
+                        .Where(vn => vn.Title.ToLower().Contains(searchLowerCase) || vn.AnotherTitles!.Contains(searchLowerCase));
+                }
                 #endregion
 
                 var query = from novel in vns
@@ -348,10 +403,10 @@ namespace VN_API.Services
                         visualNovels = visualNovels.OrderBy(vn => vn.VisualNovel.DateUpdated).ToList();
                         break;
                     case Sort.ReleaseDateDescending:
-                        visualNovels = visualNovels.OrderByDescending(vn => vn.VisualNovel.ReleaseYear).ToList();
+                        visualNovels = visualNovels.OrderByDescending(vn => vn.VisualNovel.ReleaseDate).ToList();
                         break;
                     case Sort.ReleaseDateAscending:
-                        visualNovels = visualNovels.OrderBy(vn => vn.VisualNovel.ReleaseYear).ToList();
+                        visualNovels = visualNovels.OrderBy(vn => vn.VisualNovel.ReleaseDate).ToList();
                         break;
                     case Sort.RatingDescending:
                         visualNovels = visualNovels.OrderByDescending(vn => vn.AverageRating).ToList();
@@ -407,7 +462,7 @@ namespace VN_API.Services
                         break;
                 }
 
-                
+
 
                 //_cache.Set(VisualNovelListCacheKey + $"_page_filtred_with_rating_{@params.Page}", visualNovels, cacheOptions);
 
@@ -432,9 +487,48 @@ namespace VN_API.Services
                     .Include(vn => vn.Languages)
                     .Include(vn => vn.Translator)
                     .Include(vn => vn.Author)
-                    .Include(vn => vn.Links)
+                    .Include(vn => vn.DownloadLinks)
                     .Include(vn => vn.OtherLinks)
+                    .Include(vn => vn.AnimeLinks)
+                    .Include(vn => vn.RelatedNovels)
+                        .ThenInclude(r => r.RelatedVisualNovel)
+                    .AsSplitQuery()
                     .FirstOrDefaultAsync(vn => vn.Id == id);
+
+                if (visualNovel == null)
+                {
+                    return null;
+                }
+
+                return visualNovel;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        public async Task<VisualNovel> GetVisualNovelAsync(string linkName)
+        {
+            try
+            {
+                //var vn = await GetVisualNovelsAsync();
+
+                VisualNovel visualNovel = await _db.VisualNovels
+                    .Include(vn => vn.Genres)
+                    //.Include(vn => vn.Tags.Where(tag => tag.SpoilerLevel <= spoilerLevel))
+                    //    .ThenInclude(tag => tag.Tag)
+                    .Include(vn => vn.Platforms)
+                    .Include(vn => vn.Languages)
+                    .Include(vn => vn.Translator)
+                    .Include(vn => vn.Author)
+                    .Include(vn => vn.DownloadLinks)
+                    .Include(vn => vn.OtherLinks)
+                    .Include(vn => vn.AnimeLinks)
+                    .Include(vn => vn.RelatedNovels)
+                        .ThenInclude(r => r.RelatedVisualNovel)
+                    .AsSplitQuery()
+                    .FirstOrDefaultAsync(vn => vn.LinkName == linkName);
 
                 if (visualNovel == null)
                 {
@@ -579,107 +673,244 @@ namespace VN_API.Services
 
         public async Task<VisualNovel> AddVisualNovelAsync(VisualNovel vn)
         {
-            try
+            using (var transaction = await _db.Database.BeginTransactionAsync())
             {
-                var gamingPlatforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Contains(gp)).ToList();
-
-                var tags = vn.Tags;
-
-                var genres = _db.Genres.Where(genre => vn.Genres.Contains(genre)).ToList();
-
-                var languages = _db.Languages.Where(lang => vn.Languages.Contains(lang)).ToList();
-
-                var visualNovel = new VisualNovel()
+                try
                 {
-                    Title = vn.Title,
-                    VndbId = vn.VndbId,
+                    var gamingPlatforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Select(gp => gp.Id).Contains(gp.Id)).ToList();
 
-                    //CoverImagePath = null, TODO
+                    var downloadLinks = new List<DownloadLink>();
 
-                    OriginalTitle = vn.OriginalTitle,
-                    ReadingTime = vn.ReadingTime,
-                    Status = vn.Status,
-                    SteamLink = vn.SteamLink,
-                    TranslateLinkForSteam = vn.TranslateLinkForSteam,
-                    
-                    ReleaseYear = vn.ReleaseYear,
-
-                    DateAdded = DateTime.Now,
-                    DateUpdated = DateTime.Now,
-
-                    AddedUserName = vn.AddedUserName,
-                    Description = vn.Description,
-
-                    Translator = null,
-                    Author = null,
-
-                    Platforms = null,
-                    Tags = null,
-                    Genres = null,
-                    Languages = null,
-                    //Links = vn.Links,
-                };
-
-                await _db.VisualNovels.AddAsync(visualNovel);
-
-                await _db.SaveChangesAsync();
-
-                // TODO Not Find Visual Novel
-
-                foreach (var gp in gamingPlatforms)
-                    AddVisualNovelToGamingPlatformAsync(gp.Id, visualNovel.Id);
-
-                //foreach (var t in tags)
-                //    AddTagMetadataToVisualNovelAsync(t.Tag.Id, visualNovel.Id, t.SpoilerLevel);
-
-                foreach (var l in languages)
-                    AddVisualNovelToLanguageAsync(l.Id, visualNovel.Id); ;
-
-                foreach (var g in genres)
-                    AddVisualNovelToGenreAsync(g.Id, visualNovel.Id);
-
-                foreach (var a in vn.Author)
-                    await AddVisualNovelToAuthorAsync(a.Id, visualNovel.Id);
-                
-                if (vn.Translator != null)
-                    await AddVisualNovelToTranslatorAsync(vn.Translator.Id, visualNovel.Id);
-
-                if (vn.Links != null)
-                {
-                    foreach (var link in vn.Links)
+                    foreach (var downloadLink in vn.DownloadLinks)
                     {
-                        await AddDownloadLinkAsync(link);
-                        await AddDownloadLinksToVisualNovelAsync(link.Id, visualNovel.Id);
-                    }
-                }     
+                        int platformId = downloadLink.GamingPlatform.Id;
 
-                if (vn.OtherLinks != null)
-                {
-                    foreach (var link in vn.OtherLinks)
-                    {
-                        await AddOtherLinkAsync(link);
-                        await AddOtherLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                        var link = new DownloadLink()
+                        {
+                            Id = downloadLink.Id,
+                            Url = downloadLink.Url,
+                            GamingPlatform = gamingPlatforms.Where(gp => gp.Id == platformId).FirstOrDefault()
+                        };
+
+                        downloadLinks.Add(link);
                     }
-                        
+
+                    //var tags = vn.Tags;
+
+                    //var genres = _db.Genres.Where(genre => vn.Genres.Select(genre => genre.Id).Contains(genre.Id)).ToList();
+
+                    //var languages = _db.Languages.Where(lang => vn.Languages.Select(lang => lang.Id).Contains(lang.Id)).ToList();
+
+                    var sanitizer = new HtmlSanitizer();
+
+                    var sanitizedDescription = sanitizer.Sanitize(vn.Description);
+
+                    var visualNovel = new VisualNovel()
+                    {
+                        VndbId = vn.VndbId,
+                        LinkName = vn.LinkName,
+                        Title = vn.Title,
+                        AnotherTitles = vn.AnotherTitles,
+
+                        Status = vn.Status,
+                        ReadingTime = vn.ReadingTime,
+
+                        ReleaseYear = vn.ReleaseYear,
+                        ReleaseDay = vn.ReleaseDay,
+                        ReleaseMonth = vn.ReleaseMonth,
+
+                        SteamLink = vn.SteamLink,
+                        TranslateLinkForSteam = vn.TranslateLinkForSteam,
+
+                        AddedUserName = vn.AddedUserName,
+                        AdddeUserId = vn.AdddeUserId,
+                        Description = sanitizedDescription,
+
+                        DateAdded = DateTime.Now,
+                        DateUpdated = DateTime.Now,
+
+                        AnimeLinks = vn.AnimeLinks,
+                        SoundtrackYoutubePlaylistLink = vn.SoundtrackYoutubePlaylistLink,
+                        ScreenshotLinks = new List<string>(),
+
+                        Translator = await _db.Translators.Where(t => vn.Translator.Select(t => t.Id).Contains(t.Id)).ToListAsync(),
+                        Author = await _db.Authors.Where(a => vn.Author.Select(a => a.Id).Contains(a.Id)).ToListAsync(),
+                        //Platforms = await _db.GamingPlatforms.Where(gp => gp.Id == 4).ToListAsync(),
+
+                        //Tags = await _db.TagsMetadata,
+                        Genres = await _db.Genres.Where(g => vn.Genres.Select(g => g.Id).Contains(g.Id)).ToListAsync(),
+                        Languages = await _db.Languages.Where(l => vn.Languages.Select(l => l.Id).Contains(l.Id)).ToListAsync(),
+                        RelatedNovels = await _db.RelatedNovels.Where(n => vn.RelatedNovels.Select(n => n.RelatedVisualNovelId).Contains(n.RelatedVisualNovelId)).ToListAsync(),
+                        //Platforms = await _db.GamingPlatforms.Where(gp => vn.Platforms.Select(gp => gp.Id).Contains(gp.Id)).ToListAsync(),
+                        Platforms = gamingPlatforms,
+                        DownloadLinks = downloadLinks,
+                        OtherLinks = vn.OtherLinks,
+                    };
+
+                    await _db.VisualNovels.AddAsync(visualNovel);
+
+                    await _db.SaveChangesAsync();
+
+                    // TODO Not Find Visual Novel
+
+                    foreach (var gp in vn.Platforms)
+                        AddVisualNovelToGamingPlatformAsync(gp.Id, visualNovel.Id);
+
+                    ////foreach (var t in tags)
+                    ////    AddTagMetadataToVisualNovelAsync(t.Tag.Id, visualNovel.Id, t.SpoilerLevel);
+
+                    //foreach (var l in languages)
+                    //    AddVisualNovelToLanguageAsync(l.Id, visualNovel.Id); ;
+
+                    //foreach (var g in genres)
+                    //    AddVisualNovelToGenreAsync(g.Id, visualNovel.Id);
+
+                    //foreach (var a in vn.Author)
+                    //    await AddVisualNovelToAuthorAsync(a.Id, visualNovel.Id);
+
+                    //if (vn.Translator != null)
+                    //    await AddVisualNovelToTranslatorAsync(vn.Translator.Id, visualNovel.Id);
+
+                    //if (vn.Links != null)
+                    //{
+                    //    foreach (var link in vn.Links)
+                    //    {
+                    //        await AddDownloadLinkAsync(link);
+                    //        await AddDownloadLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                    //    }
+                    //}     
+
+                    //if (vn.OtherLinks != null)
+                    //{
+                    //    foreach (var link in vn.OtherLinks)
+                    //    {
+                    //        await AddOtherLinkAsync(link);
+                    //        await AddOtherLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                    //    }
+
+                    //}
+
+                    var dbvn = await _db.VisualNovels.FindAsync(visualNovel.Id);
+
+                    if (dbvn != null)
+                    {
+                        await LoadOrUpdateVNDBRating(dbvn.Id);
+
+                        if (dbvn.VndbId != null)
+                            await UpdateVisualNovelTagsFromVNDB(dbvn.Id);
+
+                        await transaction.CommitAsync();
+
+                        return dbvn;
+                    }
+
+                    await transaction.RollbackAsync();
+
+                    return null!;
                 }
-                    
-                await _db.SaveChangesAsync();
-
-                await LoadOrUpdateVNDBRating(visualNovel.Id);
-
-                if (visualNovel.VndbId != null)
-                    await UpdateVisualNovelTagsFromVNDB(visualNovel.Id);
-
-                return await _db.VisualNovels.FindAsync(visualNovel.Id);
-            }
-            catch (Exception ex)
-            {
-                if (_db.VisualNovels.Find(vn.Id) != null)
-                    _db.VisualNovels.Remove(vn);
-
-                return null;
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    return null!;
+                }
             }
         }
+
+        public async Task<VisualNovel> AddVisualNovelFromJsonAsync(VisualNovel vn)
+        {
+            using (var transaction = await _db.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    if (vn.OtherLinks == null)
+                        vn.OtherLinks = new List<OtherLink>();
+
+                    if (vn.AnimeLinks == null)
+                        vn.AnimeLinks = new List<RelatedAnimeLink>();
+
+                    if (vn.RelatedNovels == null)
+                        vn.RelatedNovels = new List<RelatedNovel>();
+
+                    if (vn.Translator != null)
+                    {
+                        List<Translator> translators = vn.Translator;
+
+                        foreach (var translator in translators)
+                        {
+                            var dbTranslator = await _db.Translators.Where(t => t.Name == translator.Name).FirstOrDefaultAsync();
+
+                            if (dbTranslator != null)
+                                continue;
+
+                            _db.Translators.Add(translator);
+                        }
+                    }
+                    
+                    if (vn.Author != null)
+                    {
+                        List<Author> authors = vn.Author;
+                        List<Author> dbAuthors = new List<Author>();
+                        foreach (var author in authors)
+                        {
+                            var dbAuthor = await _db.Authors.Where(t => t.VndbId == author.VndbId).FirstOrDefaultAsync();
+
+                            if (dbAuthor != null)
+                                continue;
+
+                            _db.Authors.Add(author);
+                        }
+                    }
+
+                    await _db.SaveChangesAsync();
+
+                    if (vn.Translator != null)
+                    {
+                        List<Translator> translators = vn.Translator;
+                        List<Translator> dbTranslators = new List<Translator>();
+                        foreach (var translator in translators)
+                        {
+                            var dbTranslator = await _db.Translators.Where(t => t.Name == translator.Name).FirstOrDefaultAsync();
+
+                            if (dbTranslator != null)
+                            {
+                                dbTranslators.Add(dbTranslator);
+                            }
+                        }
+
+                        vn.Translator = dbTranslators;
+                    }
+
+                    if (vn.Author != null)
+                    {
+                        List<Author> authors = vn.Author;
+                        List<Author> dbAuthors = new List<Author>();
+                        foreach (var author in authors)
+                        {
+                            var dbAuthor = await _db.Authors.Where(t => t.VndbId == author.VndbId).FirstOrDefaultAsync();
+
+                            if (dbAuthor != null)
+                            {
+                                dbAuthors.Add(dbAuthor);
+                            }
+                        }
+
+                        vn.Author = dbAuthors;
+                    }
+
+                    await transaction.CommitAsync();
+
+                    var dbvn = await AddVisualNovelAsync(vn);
+
+                    return dbvn;
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+        }
+
         public async Task<VisualNovel> AddCoverImageToVisualNovel(int id, IFormFile coverImage)
         {
             try
@@ -690,9 +921,7 @@ namespace VN_API.Services
 
                 string fileExtensionName = coverImage.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
 
-                string pathToLoad = $"{id}/CoverImage";
-
-                string fileName = $"{id}.{fileExtensionName}";
+                string pathToLoad = $"{id}/CoverImage/{id}.{fileExtensionName}";
 
                 var vn = await _db.VisualNovels.FindAsync(id);
 
@@ -703,9 +932,9 @@ namespace VN_API.Services
 
                 //TODO Send file to S3
 
-                await LoadToS3(coverImage, pathToLoad, fileName);
+                await LoadToS3(coverImage, pathToLoad);
 
-                vn.CoverImageFileName = fileName;
+                vn.CoverImageLink = pathToLoad;
 
                 _db.Entry(vn).State = EntityState.Modified;
 
@@ -729,9 +958,7 @@ namespace VN_API.Services
 
                 string fileExtensionName = coverImage.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
 
-                string pathToLoad = $"{id}/BackgroundImage";
-
-                string fileName = $"{id}.{fileExtensionName}";
+                string pathToLoad = $"{id}/BackgroundImage/{id}.{fileExtensionName}";
 
                 var vn = await _db.VisualNovels.FindAsync(id);
 
@@ -740,9 +967,9 @@ namespace VN_API.Services
                     return null;
                 }
 
-                await LoadToS3(coverImage, pathToLoad, fileName);
+                await LoadToS3(coverImage, pathToLoad);
 
-                vn.BackgroundImageFileName = fileName;
+                vn.BackgroundImageLink = pathToLoad;
 
                 _db.Entry(vn).State = EntityState.Modified;
 
@@ -758,164 +985,540 @@ namespace VN_API.Services
 
         public async Task<VisualNovel> AddScreenshotsToVisualNovel(int id, List<IFormFile> screenshots)
         {
-            try
+            using (var transaction = await _db.Database.BeginTransactionAsync())
             {
-                var vn = await _db.VisualNovels.FindAsync(id);
-
-                if (vn == null)
+                try
                 {
+                    var vn = await _db.VisualNovels.FindAsync(id);
+
+                    if (vn == null)
+                    {
+                        return null;
+                    }
+
+                    foreach (var iformfile in screenshots)
+                    {
+                        int indexLastDot = iformfile.FileName.LastIndexOf('.');
+
+                        int fileExtensionsNameLength = iformfile.FileName.Length - indexLastDot;
+
+                        string fileExtensionName = iformfile.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
+
+                        string pathToLoad = $"{id}/Screenshots/{Guid.NewGuid()}.{fileExtensionName}";
+
+                        await LoadToS3(iformfile, pathToLoad);
+
+                        vn.ScreenshotLinks.Add(pathToLoad);
+
+                        _db.Entry(vn).State = EntityState.Modified;
+
+                        await _db.SaveChangesAsync();
+                    }
+
+                    //_db.Entry(vn).State = EntityState.Modified;
+
+                    //await _db.SaveChangesAsync();
+
+                    await transaction.CommitAsync();
+
+                    return vn;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
                     return null;
                 }
-
-                foreach (var iformfile in screenshots)
-                {
-                    int indexLastDot = iformfile.FileName.LastIndexOf('.');
-
-                    int fileExtensionsNameLength = iformfile.FileName.Length - indexLastDot;
-
-                    string fileExtensionName = iformfile.FileName.Substring(indexLastDot + 1, fileExtensionsNameLength - 1);
-
-                    string pathToLoad = $"{id}/Screenshots";
-
-                    string fileName = $"{Guid.NewGuid()}.{fileExtensionName}";
-
-                    await LoadToS3(iformfile, pathToLoad, fileName);
-
-                    vn.ScreenshotFileNames.Add(fileName);
-
-                    _db.Entry(vn).State = EntityState.Modified;
-
-                    await _db.SaveChangesAsync();
-                }
-
-                //_db.Entry(vn).State = EntityState.Modified;
-
-                //await _db.SaveChangesAsync();
-
-                return vn;
-            }
-            catch (Exception ex)
-            {
-                return null;
             }
         }
 
-        public async Task LoadToS3(IFormFile file, string path, string fileName)
+        public async Task LoadToS3(IFormFile file, string path)
         {
-            var fileTransferUtility = new TransferUtility(_s3Client);
+            var fileTransferUtility = new Amazon.S3.Transfer.TransferUtility(_s3Client);
 
             using (var newMemoryStream = new MemoryStream())
             {
                 await file.CopyToAsync(newMemoryStream);
 
-                var uploadRequest = new TransferUtilityUploadRequest
+                var uploadRequest = new Amazon.S3.Transfer.TransferUtilityUploadRequest
                 {
                     InputStream = newMemoryStream,
-                    Key = $"{path}/{fileName}",
+                    Key = path,
                     BucketName = bucketName,
                     ContentType = file.ContentType,
-                    CannedACL = S3CannedACL.PublicRead // Доступ к файлу публичный
+                    CannedACL = Amazon.S3.S3CannedACL.PublicRead // Доступ к файлу публичный
                 };
 
                 await fileTransferUtility.UploadAsync(uploadRequest);
             }
         }
 
-        public async Task<VisualNovel> UpdateVisualNovelAsync([FromBody] VisualNovel vn)
+        public async Task DeleteFromS3(string path)
         {
             try
             {
-                var visualNovel = _db.VisualNovels
-                    .Include(dbvn => dbvn.Genres)
-                    .Include(dbvn => dbvn.Tags)
-                        .ThenInclude(tag => tag.Tag)
-                    .Include(dbvn => dbvn.Platforms)
-                    .Include(dbvn => dbvn.Languages)
-                    .Include(dbvn => dbvn.Translator)
-                    .Include(dbvn => dbvn.Author)
-                    .Include(dbvn => dbvn.Links)
-                    .Include(dbvn => dbvn.OtherLinks)
-                    .FirstOrDefault(dbvn => dbvn.Id == vn.Id);
+                var deleteObjectRequest = new Amazon.S3.Model.DeleteObjectRequest { BucketName = bucketName, Key = path };
+                await _s3Client.DeleteObjectAsync(deleteObjectRequest);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
 
-                if (visualNovel == null)
+        public async Task DeleteScreenshotsFolderS3(int vnId)
+        {
+            var vn = await _db.VisualNovels.FindAsync(vnId);
+
+            if (vn != null && vn.ScreenshotLinks != null)
+            {
+                vn.ScreenshotLinks.Clear();
+
+                string path = $"{vn.Id}/Screenshots";
+
+                var listObjectsRequest = new Amazon.S3.Model.ListObjectsV2Request
                 {
-                    return null;
+                    BucketName = bucketName,
+                    Prefix = path
+                };
+
+                var listObjectsResponse = await _s3Client.ListObjectsV2Async(listObjectsRequest);
+
+                if (listObjectsResponse.S3Objects.Count == 0)
+                {
+                    Console.WriteLine("No objects found with the specified prefix.");
+                    return;
                 }
 
-                visualNovel.Title = vn.Title;
-                visualNovel.VndbId = vn.VndbId;
-                visualNovel.OriginalTitle = vn.OriginalTitle;
-                visualNovel.Status = vn.Status;
-                visualNovel.ReadingTime = vn.ReadingTime;
-                visualNovel.ReleaseYear = vn.ReleaseYear;
-                visualNovel.AddedUserName = vn.AddedUserName;
-                visualNovel.Description = vn.Description;
-                
-                visualNovel.SteamLink = vn.SteamLink;
-                visualNovel.TranslateLinkForSteam = vn.TranslateLinkForSteam;
-                //visualNovel.Translator = vn.Translator;
-                //visualNovel.Links = vn.Links;
-                //visualNovel.DateAdded = vn.DateAdded;
-                visualNovel.DateUpdated = DateTime.Now;
-
-                foreach (var tag in visualNovel.Tags)
-                    DeleteTagMetadataToVisualNovelAsync(tag.Tag.Id, visualNovel.Id);
-
-                foreach (var tag in vn.Tags)
-                    AddTagMetadataToVisualNovelAsync(tag.Tag.Id, visualNovel.Id, tag.SpoilerLevel);
-
-                //visualNovel.Tags = _db.TagsMetadata.Where(t => vn.Tags.Contains(t)).ToList();
-                visualNovel.Genres = _db.Genres.Where(g => vn.Genres.Contains(g)).ToList();
-                visualNovel.Platforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Contains(gp)).ToList();
-                visualNovel.Languages = _db.Languages.Where(l => vn.Languages.Contains(l)).ToList();
-                visualNovel.Author = _db.Authors.Where(a => vn.Author.Contains(a)).ToList();
-                if (vn.Translator is not null)
-                    visualNovel.Translator = await _db.Translators.FindAsync(vn.Translator.Id);
-
-                List<DownloadLink> tempDownloadLinks = new List<DownloadLink>();
-
-                tempDownloadLinks.AddRange(visualNovel.Links);
-
-                //TODO Maybe change??
-                foreach (var downloadLink in tempDownloadLinks)
+                // Удаляем объекты
+                foreach (var s3Object in listObjectsResponse.S3Objects)
                 {
-                    await DeleteDownloadLinksToVisualNovelAsync(downloadLink.Id, visualNovel.Id);
-                    await DeleteDownloadLink(downloadLink);
+                    var deleteObjectRequest = new Amazon.S3.Model.DeleteObjectRequest
+                    {
+                        BucketName = bucketName,
+                        Key = s3Object.Key
+                    };
+
+                    await _s3Client.DeleteObjectAsync(deleteObjectRequest);
+                    Console.WriteLine($"Deleted {s3Object.Key}");
                 }
-
-                foreach (var downloadLink in vn.Links)
-                {
-                    var link = await AddDownloadLinkAsync(downloadLink);
-                    await AddDownloadLinksToVisualNovelAsync(link.Id, visualNovel.Id);
-                }
-
-                List<OtherLink> tempOtherLinks = new List<OtherLink>();
-
-                tempOtherLinks.AddRange(visualNovel.OtherLinks);
-
-                foreach (var otherLink in tempOtherLinks)
-                {
-                    await DeleteOtherLinksToVisualNovelAsync(otherLink.Id, visualNovel.Id);
-                    await DeleteOtherLink(otherLink);
-                }
-
-                foreach (var otherLink in vn.OtherLinks)
-                {
-                    var link = await AddOtherLinkAsync(otherLink);
-                    await AddOtherLinksToVisualNovelAsync(link.Id, visualNovel.Id);
-                }
-
-                await LoadOrUpdateVNDBRating(visualNovel.Id);
-
-                _db.Entry(visualNovel).State = EntityState.Modified;
 
                 await _db.SaveChangesAsync();
-
-                return visualNovel;
             }
-            catch (Exception ex)
+        }
+
+        public async Task<VisualNovel> UpdateVisualNovelAsync([FromBody] VisualNovel vn)
+        {
+            using (var transaction = await _db.Database.BeginTransactionAsync())
             {
-                return null;
+                try
+                {
+                    var visualNovel = await _db.VisualNovels
+                        .Include(dbvn => dbvn.Genres)
+                        .Include(dbvn => dbvn.Tags)
+                            .ThenInclude(tag => tag.Tag)
+                        .Include(dbvn => dbvn.Platforms)
+                        .Include(dbvn => dbvn.Languages)
+                        .Include(dbvn => dbvn.Translator)
+                        .Include(dbvn => dbvn.Author)
+                        .Include(dbvn => dbvn.DownloadLinks)
+                        .Include(dbvn => dbvn.OtherLinks)
+                        .Include(dbvn => dbvn.AnimeLinks)
+                        .Include(dbvn => dbvn.RelatedNovels)
+                        .AsSplitQuery()
+                        .FirstOrDefaultAsync(dbvn => dbvn.Id == vn.Id);
+
+                    if (visualNovel == null)
+                    {
+                        return null;
+                    }
+
+                    var existingPlatformsIds = visualNovel.Platforms.Select(gp => gp.Id).ToList();
+                    var newPlatformsIds = vn.Platforms.Select(gp => gp.Id);
+                    var platformsToRemove = visualNovel.Platforms.Where(gp => !newPlatformsIds.Contains(gp.Id)).ToList();
+                    var platformsToAdd = newPlatformsIds.Where(id => !existingPlatformsIds.Contains(id))
+                                                   .Select(id => new GamingPlatform { Id = id }).ToList();
+
+                    // Удаляем старые связи
+                    foreach (var platform in platformsToRemove)
+                    {
+                        visualNovel.Platforms.Remove(platform);
+                    }
+
+                    // Добавляем новые связи
+                    foreach (var platform in platformsToAdd)
+                    {
+                        _db.Entry(platform).State = EntityState.Unchanged; // Убедитесь, что автор уже существует в базе данных
+                        visualNovel.Platforms.Add(platform);
+                    }
+
+                    var existingTranslatorsIds = visualNovel.Translator.Select(gp => gp.Id).ToList();
+                    var newTranslatorsIds = vn.Translator.Select(gp => gp.Id);
+                    var translatorsToRemove = visualNovel.Translator.Where(gp => !newTranslatorsIds.Contains(gp.Id)).ToList();
+                    var translatorsToAdd = newTranslatorsIds.Where(id => !existingTranslatorsIds.Contains(id))
+                                                   .Select(id => new Translator { Id = id }).ToList();
+
+                    // Удаляем старые связи
+                    foreach (var translator in translatorsToRemove)
+                    {
+                        visualNovel.Translator.Remove(translator);
+                    }
+
+                    // Добавляем новые связи
+                    foreach (var translator in translatorsToAdd)
+                    {
+                        _db.Entry(translator).State = EntityState.Unchanged; // Убедитесь, что автор уже существует в базе данных
+                        visualNovel.Translator.Add(translator);
+                    }
+
+                    var existingGenresIds = visualNovel.Genres.Select(gp => gp.Id).ToList();
+                    var newGenresIds = vn.Genres.Select(gp => gp.Id);
+                    var genresToRemove = visualNovel.Genres.Where(gp => !newGenresIds.Contains(gp.Id)).ToList();
+                    var genresToAdd = newGenresIds.Where(id => !existingGenresIds.Contains(id))
+                                                   .Select(id => new Genre { Id = id }).ToList();
+
+                    // Удаляем старые связи
+                    foreach (var genre in genresToRemove)
+                    {
+                        visualNovel.Genres.Remove(genre);
+                    }
+
+                    // Добавляем новые связи
+                    foreach (var genre in genresToAdd)
+                    {
+                        _db.Entry(genre).State = EntityState.Unchanged; // Убедитесь, что автор уже существует в базе данных
+                        visualNovel.Genres.Add(genre);
+                    }
+
+                    var existingAuthorsIds = visualNovel.Author.Select(gp => gp.Id).ToList();
+                    var newAuthorsIds = vn.Author.Select(gp => gp.Id);
+                    var authorsToRemove = visualNovel.Author.Where(gp => !newAuthorsIds.Contains(gp.Id)).ToList();
+                    var authorsToAdd = newAuthorsIds.Where(id => !existingAuthorsIds.Contains(id))
+                                                   .Select(id => new Author { Id = id }).ToList();
+
+                    // Удаляем старые связи
+                    foreach (var authors in authorsToRemove)
+                    {
+                        visualNovel.Author.Remove(authors);
+                    }
+
+                    // Добавляем новые связи
+                    foreach (var authors in authorsToAdd)
+                    {
+                        _db.Entry(authors).State = EntityState.Unchanged; // Убедитесь, что автор уже существует в базе данных
+                        visualNovel.Author.Add(authors);
+                    }
+
+                    var existingLanguagesIds = visualNovel.Languages.Select(gp => gp.Id).ToList();
+                    var newLanguagesIds = vn.Languages.Select(gp => gp.Id);
+                    var languagesToRemove = visualNovel.Languages.Where(gp => !newLanguagesIds.Contains(gp.Id)).ToList();
+                    var languagesToAdd = newLanguagesIds.Where(id => !existingLanguagesIds.Contains(id))
+                                                   .Select(id => new Language { Id = id }).ToList();
+
+                    // Удаляем старые связи
+                    foreach (var language in languagesToRemove)
+                    {
+                        visualNovel.Languages.Remove(language);
+                    }
+
+                    // Добавляем новые связи
+                    foreach (var language in languagesToAdd)
+                    {
+                        _db.Entry(language).State = EntityState.Unchanged; // Убедитесь, что автор уже существует в базе данных
+                        visualNovel.Languages.Add(language);
+                    }
+
+                    //if (visualNovel.DownloadLinks != null)
+                    //{
+                    //    _db.DownloadLinks.RemoveRange(visualNovel.DownloadLinks);
+                    //    await _db.SaveChangesAsync();
+                    //}
+
+                    //if (visualNovel.Platforms != null)
+                    //{
+                    //    _db.GamingPlatforms.RemoveRange(visualNovel.Platforms);
+                    //    await _db.SaveChangesAsync();
+                    //}
+
+
+                    //var existingRelatedNovelsIds = visualNovel.RelatedNovels.Select(gp => gp.RelatedVisualNovelId).ToList();
+                    //var newRelatedNovelsIds = vn.RelatedNovels.Select(related => related.RelatedVisualNovelId);
+                    //var relatedNovelsToRemove = visualNovel.RelatedNovels.Where(related => !newRelatedNovelsIds.Contains(related.RelatedVisualNovelId)).ToList();
+                    //var relatedNovelsToAdd = newRelatedNovelsIds.Where(id => !existingPlatformsIds.Contains(id))
+                    //                               .Select(id => new RelatedNovel 
+                    //                               { 
+                    //                                   //VisualNovel = visualNovel,
+                    //                                   VisualNovelId = visualNovel.Id,
+                    //                                   //RelatedVisualNovel = _db.VisualNovels.Find(id),
+                    //                                   RelatedVisualNovelId = id,
+                    //                               }).ToList();
+
+                    //// Удаляем старые связи
+                    //foreach (var novel in relatedNovelsToRemove)
+                    //{
+                    //    visualNovel.RelatedNovels.Remove(novel);
+                    //}
+
+                    //// Добавляем новые связи
+                    //foreach (var novel in relatedNovelsToAdd)
+                    //{
+                    //    var relatedVisualNovel = _db.VisualNovels.AsNoTracking().FirstOrDefault(vn => vn.Id == novel.RelatedVisualNovelId);
+
+                    //    if (relatedVisualNovel != null)
+                    //    {
+                    //        var newRelatedNovel = new RelatedNovel
+                    //        {
+                    //            VisualNovelId = visualNovel.Id,
+                    //            RelatedVisualNovelId = novel.RelatedVisualNovelId,
+                    //            RelatedVisualNovel = relatedVisualNovel
+                    //        };
+
+                    //        visualNovel.RelatedNovels.Add(newRelatedNovel);
+                    //    }
+                    //}
+
+                    //var gamingPlatforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Select(gp => gp.Id).Contains(gp.Id)).ToList();
+
+                    //var downloadLinks = new List<DownloadLink>();
+
+                    //foreach (var downloadLink in vn.DownloadLinks)
+                    //{
+                    //    int platformId = downloadLink.GamingPlatform.Id;
+
+                    //    var link = new DownloadLink()
+                    //    {
+                    //        Id = Guid.NewGuid(),
+                    //        Url = downloadLink.Url,
+                    //        GamingPlatform = visualNovel.Platforms.Where(gp => gp.Id == platformId).FirstOrDefault()
+                    //    };
+
+                    //    downloadLinks.Add(link);
+                    //}
+
+                    //var tags = vn.Tags;
+
+                    //var genres = _db.Genres.Where(genre => vn.Genres.Select(genre => genre.Id).Contains(genre.Id)).ToList();
+
+                    //var languages = _db.Languages.Where(lang => vn.Languages.Select(lang => lang.Id).Contains(lang.Id)).ToList();
+
+                    var sanitizer = new HtmlSanitizer();
+
+                    var sanitizedDescription = sanitizer.Sanitize(vn.Description);
+
+                    visualNovel.VndbId = vn.VndbId;
+                    visualNovel.LinkName = vn.LinkName;
+                    visualNovel.Title = vn.Title;
+                    visualNovel.AnotherTitles = vn.AnotherTitles;
+                    visualNovel.Status = vn.Status;
+                    visualNovel.ReadingTime = vn.ReadingTime;
+                    visualNovel.ReleaseYear = vn.ReleaseYear;
+                    visualNovel.ReleaseDay = vn.ReleaseDay;
+                    visualNovel.ReleaseMonth = vn.ReleaseMonth;
+                    visualNovel.SteamLink = vn.SteamLink;
+                    visualNovel.TranslateLinkForSteam = vn.TranslateLinkForSteam;
+                    visualNovel.Description = sanitizedDescription;
+                    visualNovel.DateUpdated = DateTime.Now;
+                    visualNovel.SoundtrackYoutubePlaylistLink = vn.SoundtrackYoutubePlaylistLink;
+
+                    List<OtherLink> otherLinks = new List<OtherLink>();
+                    if (vn.OtherLinks != null)
+                    {
+                        foreach (var item in vn.OtherLinks)
+                        {
+                            var otherLink = new OtherLink()
+                            {
+                                Name = item.Name,
+                                Url = item.Url
+                            };
+
+                            otherLinks.Add(otherLink);
+                        }
+
+                        _db.OtherLinks.RemoveRange(await _db.OtherLinks.Where(otherLink => otherLink.VisualNovel.Id == visualNovel.Id).ToListAsync());
+                    }
+
+                    List<RelatedAnimeLink> animeLinks = new List<RelatedAnimeLink>();
+                    if (vn.AnimeLinks != null)
+                    {
+                        foreach (var item in vn.AnimeLinks)
+                        {
+                            var animeLink = new RelatedAnimeLink()
+                            {
+                                Name = item.Name,
+                                Url = item.Url
+                            };
+
+                            animeLinks.Add(animeLink);
+                        }
+
+                        _db.AnimeLinks.RemoveRange(await _db.AnimeLinks.Where(animeLink => animeLink.VisualNovel.Id == visualNovel.Id).ToListAsync());
+                    }
+
+                    List<DownloadLink> downloadLinks = new List<DownloadLink>();
+
+                    if (vn.DownloadLinks != null)
+                    {
+                        //_db.DownloadLinks.RemoveRange(await _db.DownloadLinks.Where(downloadLink => downloadLink.VisualNovel.Id == visualNovel.Id).ToListAsync());
+
+                        foreach (var downloadLink in vn.DownloadLinks)
+                        {
+                            int platformId = downloadLink.GamingPlatform.Id;
+                            var gpEntry = visualNovel.Platforms.Where(gp => gp.Id == platformId).FirstOrDefault();
+                            if (gpEntry != null)
+                            {
+                                _db.Entry(gpEntry).State = EntityState.Unchanged;
+                                var link = new DownloadLink()
+                                {
+                                    Id = Guid.NewGuid(),
+                                    Url = downloadLink.Url,
+                                    GamingPlatform = gpEntry
+                                };
+
+                                downloadLinks.Add(link);
+                            }
+                        }
+                    }
+
+                    //_db.AnimeLinks.RemoveRange(await _db.AnimeLinks.Where(animeLink => animeLink.VisualNovel.Id == visualNovel.Id).ToListAsync());
+
+
+                    visualNovel.AnimeLinks = animeLinks;
+                    //visualNovel.RelatedNovels = await _db.RelatedNovels.Where(n => vn.RelatedNovels.Select(n => n.RelatedVisualNovelId).Contains(n.RelatedVisualNovelId)).ToListAsync();
+                    visualNovel.OtherLinks = otherLinks;
+                    //visualNovel.DownloadLinks = downloadLinks;
+
+                    //visualNovel.Translator = await _db.Translators.Where(t => vn.Translator.Select(t => t.Id).Contains(t.Id)).ToListAsync();
+                    //visualNovel.Author = await _db.Authors.Where(a => vn.Author.Select(a => a.Id).Contains(a.Id)).ToListAsync();
+                    //visualNovel.Genres = await _db.Genres.Where(g => vn.Genres.Select(g => g.Id).Contains(g.Id)).ToListAsync();
+                    //visualNovel.Languages = await _db.Languages.Where(l => vn.Languages.Select(l => l.Id).Contains(l.Id)).ToListAsync();
+
+
+                    //visualNovel.Title = vn.Title;
+                    //visualNovel.VndbId = vn.VndbId;
+                    //visualNovel.OriginalTitle = vn.OriginalTitle;
+                    //visualNovel.Status = vn.Status;
+                    //visualNovel.ReadingTime = vn.ReadingTime;
+                    //visualNovel.ReleaseYear = vn.ReleaseYear;
+                    //visualNovel.AddedUserName = vn.AddedUserName;
+                    //visualNovel.Description = vn.Description;
+
+                    //visualNovel.SteamLink = vn.SteamLink;
+                    //visualNovel.TranslateLinkForSteam = vn.TranslateLinkForSteam;
+                    ////visualNovel.Translator = vn.Translator;
+                    ////visualNovel.Links = vn.Links;
+                    ////visualNovel.DateAdded = vn.DateAdded;
+                    //visualNovel.DateUpdated = DateTime.Now;
+
+                    //foreach (var tag in visualNovel.Tags)
+                    //    DeleteTagMetadataToVisualNovelAsync(tag.Tag.Id, visualNovel.Id);
+
+                    //foreach (var tag in vn.Tags)
+                    //    AddTagMetadataToVisualNovelAsync(tag.Tag.Id, visualNovel.Id, tag.SpoilerLevel);
+
+                    ////visualNovel.Tags = _db.TagsMetadata.Where(t => vn.Tags.Contains(t)).ToList();
+                    //visualNovel.Genres = _db.Genres.Where(g => vn.Genres.Contains(g)).ToList();
+                    //visualNovel.Platforms = _db.GamingPlatforms.Where(gp => vn.Platforms.Contains(gp)).ToList();
+                    //visualNovel.Languages = _db.Languages.Where(l => vn.Languages.Contains(l)).ToList();
+                    //visualNovel.Author = _db.Authors.Where(a => vn.Author.Contains(a)).ToList();
+                    //if (vn.Translator is not null)
+                    //    visualNovel.Translator = await _db.Translators.FindAsync(vn.Translator.Id);
+
+                    List<RelatedNovel> tempRelatedNovels = new List<RelatedNovel>();
+
+                    tempRelatedNovels.AddRange(visualNovel.RelatedNovels);
+                        
+                    foreach (var novel in tempRelatedNovels)
+                    {
+                        var dbNovel = await _db.RelatedNovels.Where(related => related.VisualNovelId == visualNovel.Id && related.RelatedVisualNovelId == novel.RelatedVisualNovelId).FirstOrDefaultAsync();
+                        visualNovel.RelatedNovels.Remove(dbNovel);
+                        //await _db.SaveChangesAsync();
+                    }
+
+                    foreach (var novel in vn.RelatedNovels)
+                    {
+                        var relatedNovel = new RelatedNovel()
+                        {
+                            RelatedVisualNovelId = novel.RelatedVisualNovelId,
+                            VisualNovelId = visualNovel.Id,
+                        };
+
+                        visualNovel.RelatedNovels.Add(relatedNovel);
+                    }
+
+                    //TODO Maybe change??
+                    if (visualNovel.DownloadLinks != null)
+                    {
+                        List<DownloadLink> tempDownloadLinks = new List<DownloadLink>();
+
+                        tempDownloadLinks.AddRange(visualNovel.DownloadLinks);
+
+                        foreach (var downloadLink in tempDownloadLinks)
+                        {
+                            await DeleteDownloadLinksToVisualNovelAsync(downloadLink.Id, visualNovel.Id);
+                            await DeleteDownloadLink(downloadLink);
+                        }
+                    }
+
+                    foreach (var downloadLink in downloadLinks)
+                    {
+                        var link = await AddDownloadLinkAsync(downloadLink);
+                        await AddDownloadLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                    }
+
+                    //List<OtherLink> tempOtherLinks = new List<OtherLink>();
+
+                    //tempOtherLinks.AddRange(visualNovel.OtherLinks);
+
+                    //foreach (var otherLink in tempOtherLinks)
+                    //{
+                    //    await DeleteOtherLinksToVisualNovelAsync(otherLink.Id, visualNovel.Id);
+                    //    await DeleteOtherLink(otherLink);
+                    //}
+
+                    //foreach (var otherLink in vn.OtherLinks)
+                    //{
+                    //    var link = await AddOtherLinkAsync(otherLink);
+                    //    await AddOtherLinksToVisualNovelAsync(link.Id, visualNovel.Id);
+                    //}
+
+                    _db.Entry(visualNovel).State = EntityState.Modified;
+
+                    await _db.SaveChangesAsync();
+
+                    await LoadOrUpdateVNDBRating(visualNovel.Id);
+
+                    await transaction.CommitAsync();
+
+                    return visualNovel;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    return null;
+                }
+            }
+        }
+
+        public async Task UpdateVisualNovelLinkName(int id, string linkName)
+        {
+            try
+            {
+                var vn = await _db.VisualNovels.FindAsync(id);
+
+                if (vn == null)
+                {
+                    return;
+                }
+
+                _db.Entry(vn).State = EntityState.Modified;
+
+                vn.LinkName = linkName;
+
+                await _db.SaveChangesAsync();
+            }
+            catch (Exception)
+            {
+
+                throw;
             }
         }
 
@@ -1531,14 +2134,14 @@ namespace VN_API.Services
             {
                 var position = (@params.Page - 1) * @params.ItemsPerPage;
 
-                var paginatedTags = await 
+                var paginatedTags = await
                     _db.Tags
                         .OrderBy(t => t.Id)
                         .Where(t => t.Applicable == true)
                         .Skip(position)
                         .Take(@params.ItemsPerPage)
                         .ToListAsync();
-                
+
                 var count = await _db.Tags.Where(t => t.Applicable == true).CountAsync();
 
                 return (paginatedTags, count);
@@ -1560,7 +2163,7 @@ namespace VN_API.Services
 
                 query = query.ToLower();
 
-                var tags = await 
+                var tags = await
                     _db.Tags
                     .OrderBy(t => t.Id)
                     .Where(t => t.Applicable == true && t.Name.ToLower().Contains(query) || t.EnglishName.ToLower().Contains(query))
@@ -1568,7 +2171,7 @@ namespace VN_API.Services
                     .Take(@params.ItemsPerPage)
                     .ToListAsync(); ; // TODO
 
-                var count = await 
+                var count = await
                     _db.Tags
                     .Where(t => t.Applicable == true && t.Name.ToLower().Contains(query) || t.EnglishName.ToLower().Contains(query))
                     .CountAsync();
@@ -1864,11 +2467,23 @@ namespace VN_API.Services
         {
             try
             {
-                return (await _db.Rating.Where(rating => rating.VisualNovelId == id).AverageAsync(rating => rating.Rating), await _db.Rating.Where(rating => rating.VisualNovelId == id).CountAsync());
-            }
-            catch (Exception ex)
-            {
+                if (_db.Rating.Where(r => r.VisualNovelId == id).Any())
+                {
+                    var cortage = (await _db.Rating
+                    .Where(rating => rating.VisualNovelId == id)
+                    .AverageAsync(rating => rating.Rating),
+                 await _db.Rating
+                    .Where(rating => rating.VisualNovelId == id)
+                    .CountAsync());
+
+                    return cortage;
+                }
+
                 return (-1, -1);
+            }
+            catch (Exception)
+            {
+                throw;
             }
         }
 
@@ -1879,6 +2494,13 @@ namespace VN_API.Services
                 var visualNovel = await _db.VisualNovels.FindAsync(vnRating.VisualNovelId);
 
                 if (visualNovel == null)
+                {
+                    return null;
+                }
+
+                var dbRating = await _db.Rating.Where(r => r.UserId == vnRating.UserId && r.VisualNovelId == vnRating.VisualNovelId).FirstOrDefaultAsync();
+
+                if (dbRating != null)
                 {
                     return null;
                 }
@@ -1934,6 +2556,73 @@ namespace VN_API.Services
             try
             {
                 VisualNovelRating rating = await _db.Rating.FindAsync(vnRating.Id);
+
+                if (rating == null)
+                {
+                    return (false, "Rating could not be found");
+                }
+
+                _db.Rating.Remove(rating);
+
+                await _db.SaveChangesAsync();
+
+                return (true, "Rating got deleted");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Error, {ex.Message}");
+            }
+        }
+
+        public async Task<int> GetVisualNovelUserRatingAsync(Guid userId, int visualNovelId)
+        {
+            try
+            {
+                return await _db.Rating
+                    .Where(rating => rating.UserId == userId && rating.VisualNovelId == visualNovelId)
+                    .Select(rating => rating.Rating)
+                    .FirstOrDefaultAsync();
+            }
+            catch (Exception ex)
+            {
+                return -1;
+            }
+        }
+
+        public async Task<VisualNovelRating> UpdateRatingByUserAsync(Guid userId, int visualNovelId, int rating)
+        {
+            try
+            {
+                VisualNovelRating dbRating = await _db.Rating
+                    .Where(r => r.UserId == userId && r.VisualNovelId == visualNovelId)
+                    .FirstOrDefaultAsync();
+
+                if (dbRating == null)
+                {
+                    return null;
+                }
+
+                dbRating.Rating = rating;
+
+                _db.Entry(dbRating).State = EntityState.Modified;
+
+                await _db.SaveChangesAsync();
+
+                return dbRating;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        public async Task<(bool, string)> RemoveRatingByUserAsync(Guid userId, int visualNovelId)
+        {
+            try
+            {
+                VisualNovelRating rating = await _db.Rating
+                    .Where(rating => rating.UserId == userId && rating.VisualNovelId == visualNovelId)
+                    .FirstOrDefaultAsync();
 
                 if (rating == null)
                 {
@@ -2281,7 +2970,7 @@ namespace VN_API.Services
                 var downloadLink = await _db.DownloadLinks.FindAsync(downloadLinkId);
                 var vn = await _db.VisualNovels.FindAsync(vnId);
 
-                vn.Links.Add(downloadLink);
+                vn.DownloadLinks.Add(downloadLink);
                 //await _db.SaveChangesAsync();
             }
             catch (Exception)
@@ -2298,7 +2987,7 @@ namespace VN_API.Services
                 var downloadLink = await _db.DownloadLinks.FindAsync(downloadLinkId);
                 var vn = await _db.VisualNovels.FindAsync(vnId);
 
-                vn.Links.Remove(downloadLink);
+                vn.DownloadLinks.Remove(downloadLink);
                 //await _db.SaveChangesAsync();
             }
             catch (Exception)
@@ -2478,8 +3167,363 @@ namespace VN_API.Services
                 return (false, $"Error, {ex.Message}");
             }
         }
+        #endregion
+        #region Visual Novel List
+        public async Task<List<VisualNovelList>> GetVisualNovelLists(string userId, bool showPrivate)
+        {
+            try
+            {
+                var userLists = new List<VisualNovelList>();
 
-        
+                if (showPrivate)
+                {
+                    userLists = await _db.VisualNovelLists
+                        .Include(list => list.ListType)
+                        .OrderBy(list => list.ListType.Id)
+                        .Where(list => list.UserId == userId)
+                        .ToListAsync();
+
+                }
+                else
+                {
+                    userLists = await _db.VisualNovelLists
+                        .Include(list => list.ListType)
+                        .OrderBy(list => list.ListType.Id)
+                        .Where(list => list.UserId == userId && list.IsPrivate == false)
+                        .ToListAsync();
+                }
+
+                return userLists;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<List<VisualNovelListEntry>> GetVisualNovelInAnyUserList(string userId, int visualNovelId)
+        {
+            try
+            {
+                var entry = await _db.VisualNovelListEntries
+                    .Include(entry => entry.VisualNovelList)
+                        .ThenInclude(list => list.ListType)
+                    .Where(entry => entry.VisualNovelList.UserId == userId && entry.VisualNovel.Id == visualNovelId).ToListAsync();
+
+                return entry;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<VisualNovelList> GetVisualNovelList(int listId)
+        {
+            try
+            {
+                var list = await _db.VisualNovelLists
+                    .Include(list => list.ListType)
+                    .Where(list => list.Id == listId)
+                    .FirstOrDefaultAsync();
+
+                if (list == null)
+                {
+                    return null;
+                }
+
+                return list;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<List<VisualNovelListEntry>> GetUserVisualNovelsInLists(string userId, bool showPrivate)
+        {
+            try
+            {
+                var userVNInList = new List<VisualNovelListEntry?>();
+
+                if (showPrivate)
+                {
+                    userVNInList = await _db.VisualNovelListEntries
+                        .Include(listEntry => listEntry.VisualNovelList)
+                        .Include(listEntry => listEntry.VisualNovel)
+                        .Where(listEntry => listEntry.VisualNovelList.UserId == userId)
+                        .GroupBy(listEntry => listEntry.VisualNovel.Id)
+                        .Select(g => g.OrderByDescending(entry => entry.AddingTime).FirstOrDefault())
+                        .ToListAsync();
+                }
+                else
+                {
+                    userVNInList = await _db.VisualNovelListEntries
+                        .Include(listEntry => listEntry.VisualNovelList)
+                        .Include(listEntry => listEntry.VisualNovel)
+                        .Where(listEntry => listEntry.VisualNovelList.UserId == userId && listEntry.VisualNovelList.IsPrivate == showPrivate)
+                        .GroupBy(listEntry => listEntry.VisualNovel.Id)
+                        .Select(g => g.OrderByDescending(entry => entry.AddingTime).FirstOrDefault())
+                        .ToListAsync();
+                }
+
+                if (userVNInList == null)
+                {
+                    return null;
+                }
+
+
+                return userVNInList;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<List<VisualNovelListEntry>> GetVisualNovelsInList(string userId, int listId)
+        {
+            try
+            {
+                var userVNInList = new List<VisualNovelListEntry>();
+
+                var list = await _db.VisualNovelLists.FindAsync(listId);
+
+                if (list == null || list.UserId != userId)
+                {
+                    return null;
+                }
+
+                //var position = (@params.Page - 1) * @params.ItemsPerPage;
+
+                userVNInList = await _db.VisualNovelListEntries
+                    .Include(listEntry => listEntry.VisualNovel)
+                    .Where(listEntry => listEntry.VisualNovelList == list)
+                    //.Skip(position)
+                    //.Take(@params.ItemsPerPage)
+                    .ToListAsync();
+
+                return userVNInList;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<VisualNovelList> UpdateVisualNovelList(string userId, int visualNovelListId, VisualNovelList visualNovelList)
+        {
+            try
+            {
+                var dbList = await _db.VisualNovelLists.FindAsync(visualNovelListId);
+
+                if (dbList == null || dbList.UserId != userId)
+                {
+                    return null;
+                }
+
+
+                dbList.IsPrivate = visualNovelList.IsPrivate;
+                dbList.Name = visualNovelList.Name;
+
+                _db.Entry(dbList).State = EntityState.Modified;
+
+                await _db.SaveChangesAsync();
+
+                return dbList;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<(bool, string)> CreateBaseLists(string userId)
+        {
+            try
+            {
+                List<VisualNovelListType> baseListTypes = await _db.ListTypes.ToListAsync();
+
+                if (_db.VisualNovelLists.Where(list => list.UserId == userId).Any())
+                {
+                    return (false, "User have base lists");
+                }
+
+                foreach (var type in baseListTypes)
+                {
+                    var list = new VisualNovelList()
+                    {
+                        IsCustom = false,
+                        IsPrivate = false,
+                        ListType = type,
+                        UserId = userId,
+                        VisualNovelListEntries = new List<VisualNovelListEntry>(),
+                        Name = type.Name,
+                    };
+
+                    _db.VisualNovelLists.Add(list);
+                }
+
+                await _db.SaveChangesAsync();
+
+                return (true, $"Base lists added to user: {userId}");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Error, {ex.Message}");
+            }
+        }
+
+        public async Task<VisualNovelList> CreateCustomList(string userId, VisualNovelList visualNovelList)
+        {
+            try
+            {
+                var list = new VisualNovelList()
+                {
+                    IsCustom = true,
+                    IsPrivate = visualNovelList.IsPrivate,
+                    ListType = null,
+                    UserId = userId,
+                    VisualNovelListEntries = new List<VisualNovelListEntry>(),
+                    Name = visualNovelList.Name,
+                };
+
+                var dblist = _db.VisualNovelLists.Where(list => list.UserId == userId && list.Name == visualNovelList.Name).FirstOrDefault();
+
+                if (dblist != null)
+                {
+                    return null;
+                }
+
+                _db.VisualNovelLists.Add(list);
+
+                await _db.SaveChangesAsync();
+
+                return _db.VisualNovelLists.Where(list => list.UserId == userId && list.Name == visualNovelList.Name).FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        public async Task<(bool, string)> AddToList(string userId, int visualNovelListId, int visualNovelId)
+        {
+            try
+            {
+                var list = await _db.VisualNovelLists.FindAsync(visualNovelListId);
+                var vn = await _db.VisualNovels.FindAsync(visualNovelId);
+
+                if (list == null || list.UserId != userId)
+                {
+                    return (false, "Not Found List or current user haven't that list");
+                }
+
+                if (vn == null)
+                {
+                    return (false, "Visual novel couldn't exist");
+                }
+
+                var entry = new VisualNovelListEntry()
+                {
+                    VisualNovel = vn,
+                    VisualNovelList = list,
+                    AddingTime = DateTime.Now,
+                };
+
+                _db.VisualNovelListEntries.Add(entry);
+
+                await _db.SaveChangesAsync();
+
+                return (true, $"Visual Novel add to list: {visualNovelListId} is successful");
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+        }
+
+        public async Task<(bool, string)> RemoveFromList(string userId, int visualNovelListId, int visualNovelId)
+        {
+            try
+            {
+                var list = await _db.VisualNovelLists.FindAsync(visualNovelListId);
+                var vn = await _db.VisualNovels.FindAsync(visualNovelId);
+
+
+                if (list == null || list.UserId != userId)
+                {
+                    return (false, "Not Found List or current user haven't that list");
+                }
+
+                if (vn == null)
+                {
+                    return (false, "Visual novel couldn't exist");
+                }
+
+                var entry = await _db.VisualNovelListEntries.Where(e => e.VisualNovel == vn && e.VisualNovelList == list).FirstOrDefaultAsync();
+
+                if (entry == null)
+                {
+                    return (false, "Not Found Entry");
+                }
+
+                _db.VisualNovelListEntries.Remove(entry);
+
+                await _db.SaveChangesAsync();
+
+                return (true, $"Visual Novel remove from list: {visualNovelListId}");
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<(bool, string)> DeleteList(string userId, int visualNovelListId)
+        {
+            try
+            {
+                var list = await _db.VisualNovelLists.FindAsync(visualNovelListId);
+
+                if (list == null || list.UserId != userId)
+                {
+                    return (false, "Not Found List or current user haven't that list");
+                }
+
+                _db.VisualNovelLists.Remove(list);
+
+                await _db.SaveChangesAsync();
+
+                return (true, $"Visual Novel List {visualNovelListId} was removed");
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<VisualNovelListType> AddListType(string name, bool isMutuallyExclusive)
+        {
+            try
+            {
+                var listType = new VisualNovelListType()
+                {
+                    Name = name,
+                };
+
+                await _db.ListTypes.AddAsync(listType);
+
+                await _db.SaveChangesAsync();
+
+                return listType;
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+        #endregion
     }
 }
-        #endregion

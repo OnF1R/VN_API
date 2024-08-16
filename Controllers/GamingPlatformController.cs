@@ -25,7 +25,7 @@ namespace VN_API.Controllers
 
             if (gamingPlatforms == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Gaming Platfroms in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, gamingPlatforms);
@@ -42,7 +42,7 @@ namespace VN_API.Controllers
 
             if (gamingPlatforms == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Gaming Platfroms in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, gamingPlatforms);
@@ -59,7 +59,7 @@ namespace VN_API.Controllers
 
             if (gamingPlatform == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Gaming Platform found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, gamingPlatform);
@@ -76,7 +76,7 @@ namespace VN_API.Controllers
 
             if (gamingPlatform == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Gaming Platform found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, gamingPlatform);

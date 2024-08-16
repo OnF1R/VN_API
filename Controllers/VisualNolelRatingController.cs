@@ -1,3 +1,4 @@
+using Amazon.S3.Model.Internal.MarshallTransformations;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using VN_API.Models;
@@ -23,7 +24,7 @@ namespace VN_API.Controllers
 
             if (ratings == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Rating in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, ratings);
@@ -36,7 +37,7 @@ namespace VN_API.Controllers
 
             if (rating == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Rating found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, rating);
@@ -56,7 +57,7 @@ namespace VN_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Language>> AddRating([FromQuery] VisualNovelRating vnRating)
+        public async Task<ActionResult<VisualNovelRating>> AddRating([FromQuery] VisualNovelRating vnRating)
         {
             var rating = await _novelService.AddVisualNovelRatingAsync(vnRating);
 
@@ -98,6 +99,46 @@ namespace VN_API.Controllers
             }
 
             return StatusCode(StatusCodes.Status200OK, rating);
+        }
+
+        [HttpGet("GetVisualNovelUserRating")]
+        public async Task<IActionResult> GetVisualNovelUserRatingAsync(Guid userId, int visualNovelId)
+        {
+            var rating = await _novelService.GetVisualNovelUserRatingAsync(userId, visualNovelId);
+
+            if (rating < 1)
+            {
+                return StatusCode(StatusCodes.Status200OK, -1);
+            }
+
+            return StatusCode(StatusCodes.Status200OK, rating);
+        }
+
+        [HttpPut("UpdateRatingByUser")]
+        public async Task<IActionResult> UpdateRatingByUserAsync(Guid userId, int visualNovelId, int rating)
+        {
+            var updatedRating = await _novelService.UpdateRatingByUserAsync(userId, visualNovelId, rating);
+        
+            if (updatedRating == null)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
+
+            return StatusCode(StatusCodes.Status200OK, updatedRating);
+        }
+
+        [HttpDelete("RemoveRatingByUser")]
+        public async Task<IActionResult> RemoveRatingByUserAsync(Guid userId, int visualNovelId)
+        {
+            (bool status, string message) = await _novelService.RemoveRatingByUserAsync(userId, visualNovelId);
+            
+            if (status == false)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, message);
+            }
+
+            return StatusCode(StatusCodes.Status200OK, message);
+
         }
     }
 }

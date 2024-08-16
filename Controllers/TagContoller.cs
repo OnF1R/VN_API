@@ -35,7 +35,7 @@ namespace VN_API.Controllers
 
             if (tags.Item1 == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Tags in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, tags.Item1);
@@ -58,7 +58,7 @@ namespace VN_API.Controllers
 
             if (tags == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Tags in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             _cache.Set(cacheKey, tags, cacheOptions);
@@ -77,7 +77,7 @@ namespace VN_API.Controllers
 
             if (tags.Item1 == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Tags in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, tags.Item1);
@@ -90,7 +90,7 @@ namespace VN_API.Controllers
 
             if (tag == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Tag found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, tag);

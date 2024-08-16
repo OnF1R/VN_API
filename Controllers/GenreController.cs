@@ -22,7 +22,7 @@ namespace VN_API.Controllers
 
             if (genres == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Genres in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, genres);
@@ -35,7 +35,7 @@ namespace VN_API.Controllers
 
             if (genre == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Genre found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, genre);

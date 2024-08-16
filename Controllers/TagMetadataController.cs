@@ -22,7 +22,7 @@ namespace VN_API.Controllers
 
             if (tagMetadata == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No TagMetadata in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, tagMetadata);
@@ -35,7 +35,7 @@ namespace VN_API.Controllers
 
             if (tagsMetadata == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No TagsMetadata found for tag id: {tagId}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, tagsMetadata);
@@ -48,7 +48,7 @@ namespace VN_API.Controllers
 
             if (tagsMetadata == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No TagsMetadata found for visual novel id: {visualNovelId}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, tagsMetadata);

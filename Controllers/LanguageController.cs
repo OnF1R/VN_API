@@ -22,7 +22,7 @@ namespace VN_API.Controllers
 
             if (languages == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Languages in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, languages);
@@ -35,7 +35,7 @@ namespace VN_API.Controllers
 
             if (language == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Language found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, language);

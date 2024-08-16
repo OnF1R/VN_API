@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using VN_API.Models;
 using VN_API.Models.Pagination;
 using VN_API.Services.Interfaces;
@@ -27,6 +29,22 @@ namespace VN_API.Controllers
         {
             await _novelService.LoadVNDBRating();
         }
+        [HttpPut("UpdateVisualNovelLinkName")]
+        public async Task UpdateVisualNovelLinkName(int id, string linkName)
+        {
+            await _novelService.UpdateVisualNovelLinkName(id, linkName);
+        }
+
+        [HttpPut("IncrementPageViewsCount")]
+        public async Task<IActionResult> IncrementPageViewsCount(int visualNovelId)
+        {
+            var isSuccess = await _novelService.IncrementPageViewsCount(visualNovelId);
+
+            if (!isSuccess)
+                return StatusCode(StatusCodes.Status404NotFound);
+
+            return StatusCode(StatusCodes.Status200OK);
+        }
 
         [HttpGet("LoadOrUpdateVNDBRating")]
         public async Task<IActionResult> LoadVNDBRating(int id)
@@ -39,7 +57,7 @@ namespace VN_API.Controllers
             }
             catch (Exception)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "Error");
+                return StatusCode(StatusCodes.Status204NoContent);
                 //throw;
             }
         }
@@ -54,7 +72,28 @@ namespace VN_API.Controllers
             }
             catch (Exception)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "Error");
+                return StatusCode(StatusCodes.Status204NoContent);
+                //throw;
+            }
+        }
+
+        [HttpGet("GetRandom")]
+        public async Task<IActionResult> GetRandomVisualNovel()
+        {
+            try
+            {
+                var vn = await _novelService.GetRandomVisualNovel();
+
+                if (vn == null)
+                {
+                    return StatusCode(StatusCodes.Status204NoContent);
+                }
+
+                return StatusCode(StatusCodes.Status200OK, vn);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status204NoContent);
                 //throw;
             }
         }
@@ -87,7 +126,7 @@ namespace VN_API.Controllers
 
             if (paginatedVns == null || paginatedVns.Count() <= 0)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, paginatedVns);
@@ -106,7 +145,7 @@ namespace VN_API.Controllers
 
             if (paginatedVns == null || paginatedVns.Count() <= 0)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, paginatedVns);
@@ -122,7 +161,8 @@ namespace VN_API.Controllers
                 [FromQuery] List<int> platforms,
                 SpoilerLevel spoilerLevel,
                 ReadingTime readingTime,
-                Sort sort)
+                Sort sort,
+                string search = "")
         {
             string genresString = string.Join("_", genres);
             string tagsString = string.Join("_", tags);
@@ -133,7 +173,7 @@ namespace VN_API.Controllers
             string readingTimeString = sort.ToString();
 
             string cacheKey = $"_filtred_vn_with_rating_genres_{genresString}_tags_{tagsString}_languages_{languagesString}_" +
-                $"platforms_{platformsString}_spoilerLevel_{spoilerLevelString}_sort_{sortString}_readingTime_{readingTimeString}";
+                $"platforms_{platformsString}_spoilerLevel_{spoilerLevelString}_sort_{sortString}_readingTime_{readingTimeString}_search_{search}";
 
             var cacheOptions = new MemoryCacheEntryOptions()
                 .SetSlidingExpiration(TimeSpan.FromSeconds(120))
@@ -142,7 +182,8 @@ namespace VN_API.Controllers
             if (_cache.TryGetValue(cacheKey, out List<VisualNovelWithRating> vns)) { }
             else
             {
-                vns = await _novelService.GetFiltredVisualNovelsWithRatingAsync(@params, genres, tags, languages, platforms, spoilerLevel, readingTime, sort);
+                vns = await _novelService.GetFiltredVisualNovelsWithRatingAsync
+                    (@params, genres, tags, languages, platforms, spoilerLevel, readingTime, sort, search);
 
             }
 
@@ -154,7 +195,7 @@ namespace VN_API.Controllers
 
             if (paginatedVns == null || paginatedVns.Count() <= 0)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels in database with that filter");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             _cache.Set(cacheKey, vns, cacheOptions);
@@ -170,7 +211,20 @@ namespace VN_API.Controllers
 
             if (vn == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Visual Novel found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
+            }
+
+            return StatusCode(StatusCodes.Status200OK, vn);
+        }
+
+        [HttpGet("linkName")]
+        public async Task<IActionResult> GetVisualNovel(string linkName)
+        {
+            VisualNovel vn = await _novelService.GetVisualNovelAsync(linkName);
+
+            if (vn == null)
+            {
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vn);
@@ -183,7 +237,7 @@ namespace VN_API.Controllers
 
             if (img == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Cover Image for Visual Novel found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return img;
@@ -196,7 +250,7 @@ namespace VN_API.Controllers
 
             if (img == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Background Image for Visual Novel found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return img;
@@ -209,7 +263,7 @@ namespace VN_API.Controllers
 
             if (screenshotsData == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Visual Novel Screenshots found for id: {id}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return Ok(screenshotsData);
@@ -222,7 +276,7 @@ namespace VN_API.Controllers
 
             if (img == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Visual Novel Image found by path: {path}");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return img;
@@ -235,7 +289,7 @@ namespace VN_API.Controllers
 
             if (vns == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels with this tag in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vns);
@@ -248,7 +302,7 @@ namespace VN_API.Controllers
 
             if (vns == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels with this tag in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vns);
@@ -263,7 +317,7 @@ namespace VN_API.Controllers
 
             if (vns == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels with this genre in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vns);
@@ -276,7 +330,7 @@ namespace VN_API.Controllers
 
             if (vns == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels with this language in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vns);
@@ -289,7 +343,7 @@ namespace VN_API.Controllers
 
             if (vns == null)
             {
-                return StatusCode(StatusCodes.Status204NoContent, "No Visual Novels with this gaming platform in database");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vns);
@@ -302,7 +356,7 @@ namespace VN_API.Controllers
 
             if (vns == null || !vns.Any())
             {
-                return StatusCode(StatusCodes.Status204NoContent, $"No Visual Novels in database with title '{query}'");
+                return StatusCode(StatusCodes.Status204NoContent);
             }
 
             return StatusCode(StatusCodes.Status200OK, vns);
@@ -319,6 +373,44 @@ namespace VN_API.Controllers
             }
 
             return CreatedAtAction("GetVisualNovel", new { id = dbvn.Id }, dbvn);
+        }
+
+        [HttpPost("AddVisualNovelFromJson")]
+        public async Task<ActionResult<VisualNovel>> AddVisualNovelFromJson(string linkName, IFormFile visualNovelJson, string soundtrackYoutubePlaylistLink = null)
+        {
+            if (visualNovelJson == null || visualNovelJson.Length == 0)
+            {
+                return BadRequest("No file uploaded.");
+            }
+
+            using (var reader = new StreamReader(visualNovelJson.OpenReadStream()))
+            {
+                var jsonString = await reader.ReadToEndAsync();
+                VisualNovel visualNovel;
+
+                try
+                {
+                    visualNovel = JsonSerializer.Deserialize<VisualNovel>(jsonString);
+
+                    visualNovel.LinkName = linkName;
+
+                    visualNovel.SoundtrackYoutubePlaylistLink = soundtrackYoutubePlaylistLink;
+
+                    var dbvn = await _novelService.AddVisualNovelFromJsonAsync(visualNovel);
+
+                    return CreatedAtAction("GetVisualNovel", new { id = dbvn.Id }, dbvn);
+                }
+                catch (JsonException ex)
+                {
+                    return BadRequest($"Error deserializing JSON: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    return BadRequest($"Error: {ex.Message}");
+                }
+
+                // Обработайте объект модели по мере необходимости
+            }
         }
 
         [HttpPut("AddCoverImage")]
@@ -360,6 +452,22 @@ namespace VN_API.Controllers
             return CreatedAtAction("GetVisualNovel", new { id = dbvn.Id }, dbvn);
         }
 
+        [HttpGet("DeleteFromS3")]
+        public async Task<IActionResult> DeleteFromS3(string path)
+        {
+            await _novelService.DeleteFromS3(path);
+
+            return StatusCode(StatusCodes.Status200OK, path);
+        }
+
+        [HttpGet("DeleteScreenshotsFolderS3")]
+        public async Task<IActionResult> DeleteScreenshotsFolderS3(int vnId)
+        {
+            await _novelService.DeleteScreenshotsFolderS3(vnId);
+
+            return StatusCode(StatusCodes.Status200OK, vnId);
+        }
+
         [HttpPut("id")]
         public async Task<IActionResult> UpdateVisualNovel(int id, VisualNovel visualNovel)
         {
@@ -375,7 +483,7 @@ namespace VN_API.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, $"{visualNovel.Title} could not be updated");
             }
 
-            return NoContent();
+            return CreatedAtAction("GetVisualNovel", new { id = dbvn.Id }, dbvn);
         }
 
         [HttpDelete("id")]

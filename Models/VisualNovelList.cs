@@ -1,8 +1,34 @@
 ﻿namespace VN_API.Models
 {
+    public class VisualNovelListType
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public bool IsMutuallyExclusive { get; set; }
+    }
+
+    public class VisualNovelList
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        public bool IsCustom { get; set; }
+        public bool IsPrivate { get; set; }
+        public string UserId { get; set; }
+        public VisualNovelListType? ListType { get; set; }
+        public virtual ICollection<VisualNovelListEntry> VisualNovelListEntries { get; set; }
+    }
+
+    public class VisualNovelListEntry
+    {
+        public int Id { get; set; }
+        public VisualNovelList VisualNovelList { get; set; }
+        public VisualNovel VisualNovel { get; set; }
+        public DateTime AddingTime { get; set; }
+    }
+
     //public class UserLabels
     //{
-    //    public Guid Id { get; set; }
+    //    public int Id { get; set; }
     //    public int UserId { get; set; }
     //    public string Label { get; set; }
     //    public bool IsPrivate { get; set; }
