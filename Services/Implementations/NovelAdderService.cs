@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using System.IO;
+using System.Linq;
 using VN_API.Database;
 using VN_API.Models;
 using VN_API.Models.Pagination;
@@ -377,8 +378,12 @@ namespace VN_API.Services
                 {
                     string searchLowerCase = search.ToLower();
 
-                    vns = vns
-                        .Where(vn => vn.Title.ToLower().Contains(searchLowerCase) || vn.AnotherTitles!.Contains(searchLowerCase));
+                    var temp1 = vns
+                        .Where(vn => vn.Title.ToLower().Contains(searchLowerCase));
+
+                    var temp2 = vns.Where(vn => vn.AnotherTitles.Any(t => t.ToLower().Contains(searchLowerCase)));
+
+                    vns = temp1.Concat(temp2);
                 }
                 #endregion
 
@@ -403,10 +408,24 @@ namespace VN_API.Services
                         visualNovels = visualNovels.OrderBy(vn => vn.VisualNovel.DateUpdated).ToList();
                         break;
                     case Sort.ReleaseDateDescending:
-                        visualNovels = visualNovels.OrderByDescending(vn => vn.VisualNovel.ReleaseDate).ToList();
+                        //visualNovels = visualNovels.OrderByDescending(vn => vn.VisualNovel.ReleaseDate).ToList(); TODO
+                        visualNovels = visualNovels
+                            .OrderByDescending(vn =>
+                            new DateTime(
+                                vn.VisualNovel.ReleaseYear != null ? (int)vn.VisualNovel.ReleaseYear : 1900,
+                                vn.VisualNovel.ReleaseMonth != null ? (int)vn.VisualNovel.ReleaseMonth : 1,
+                                vn.VisualNovel.ReleaseDay != null ? (int)vn.VisualNovel.ReleaseDay : 1))
+                            .ToList();
                         break;
                     case Sort.ReleaseDateAscending:
-                        visualNovels = visualNovels.OrderBy(vn => vn.VisualNovel.ReleaseDate).ToList();
+                        //visualNovels = visualNovels.OrderBy(vn => vn.VisualNovel.ReleaseDate).ToList(); TODO
+                        visualNovels = visualNovels
+                            .OrderBy(vn => 
+                            new DateTime(
+                                vn.VisualNovel.ReleaseYear != null ? (int)vn.VisualNovel.ReleaseYear : 1900,
+                                vn.VisualNovel.ReleaseMonth != null ? (int)vn.VisualNovel.ReleaseMonth : 1,
+                                vn.VisualNovel.ReleaseDay != null ? (int)vn.VisualNovel.ReleaseDay : 1))
+                            .ToList();
                         break;
                     case Sort.RatingDescending:
                         visualNovels = visualNovels.OrderByDescending(vn => vn.AverageRating).ToList();
