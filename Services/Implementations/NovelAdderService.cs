@@ -408,20 +408,39 @@ namespace VN_API.Services
 
                 if (!string.IsNullOrEmpty(search))
                 {
-                    int mainMatchPercent = 50;
+                    int partialRatioPercent = 70;
+                    int weightedRatioPercent = 60;
                     int anotherMatchPercent = 76;
 
                     string searchLowerCase = search.ToLower();
 
+                    foreach (var vn in visualNovels)
+                    {
+                        var rate = Fuzz.PartialRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase);
+                        Console.WriteLine($"{vn.VisualNovel.Title}: Match {rate}/{partialRatioPercent}");
+                    }
+
+                    foreach (var vn in visualNovels)
+                    {
+                        if (vn.VisualNovel.AnotherTitles != null)
+                        {
+                            foreach (var title in vn.VisualNovel.AnotherTitles)
+                            {
+                                var rate = Fuzz.WeightedRatio(title.ToLower(), searchLowerCase);
+                                Console.WriteLine($"{title}: Match {rate}/{anotherMatchPercent}");
+                            }
+                        }
+                    }
+
                     var temp1 = visualNovels
-                        .Where(vn => Fuzz.Ratio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= mainMatchPercent)
+                        .Where(vn => Fuzz.PartialRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= partialRatioPercent)
                         .ToList();
 
                     if (temp1.Count == 0)
                     {
                         temp1 = visualNovels
-                        .Where(vn => Fuzz.WeightedRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= mainMatchPercent)
-                        .ToList();
+                            .Where(vn => Fuzz.WeightedRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= weightedRatioPercent)
+                            .ToList();
                     }
 
                     var temp2 = visualNovels
