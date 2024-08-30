@@ -1,4 +1,5 @@
-﻿using Ganss.Xss;
+﻿using FuzzySharp;
+using Ganss.Xss;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -374,17 +375,23 @@ namespace VN_API.Services
                     vns = vns.Where(vn => !vn.Platforms.Any(p => excludedPlatforms.Contains(p.Id)));
                 }
 
-                if (!string.IsNullOrEmpty(search))
-                {
-                    string searchLowerCase = search.ToLower();
+                //if (!string.IsNullOrEmpty(search))
+                //{
+                //    int matchPercent = 80;
 
-                    var temp1 = vns
-                        .Where(vn => vn.Title.ToLower().Contains(searchLowerCase));
+                //    string searchLowerCase = search.ToLower();
 
-                    var temp2 = vns.Where(vn => vn.AnotherTitles.Any(t => t.ToLower().Contains(searchLowerCase)));
+                //    var temp1 = vns
+                //        .Where(vn => Fuzz.Ratio(vn.Title.ToLower(), searchLowerCase) >= matchPercent);
+                //        //.Where(vn => vn.Title.ToLower().Contains(searchLowerCase));
 
-                    vns = temp1.Concat(temp2);
-                }
+                //    var temp2 = vns.Where(vn => vn.AnotherTitles.Any(t => Fuzz.Ratio(t.ToLower(), searchLowerCase) >= matchPercent));
+                //    //var temp2 = vns.Where(vn => vn.AnotherTitles.Any(t => t.ToLower().Contains(searchLowerCase)));
+
+                //    vns = temp1.Concat(temp2);
+
+                //    vns = vns.Distinct();
+                //}
                 #endregion
 
                 var query = from novel in vns
@@ -398,6 +405,33 @@ namespace VN_API.Services
                             };
 
                 visualNovels = await query.ToListAsync();
+
+                if (!string.IsNullOrEmpty(search))
+                {
+                    int mainMatchPercent = 50;
+                    int anotherMatchPercent = 76;
+
+                    string searchLowerCase = search.ToLower();
+
+                    var temp1 = visualNovels
+                        .Where(vn => Fuzz.Ratio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= mainMatchPercent)
+                        .ToList();
+
+                    if (temp1.Count == 0)
+                    {
+                        temp1 = visualNovels
+                        .Where(vn => Fuzz.WeightedRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= mainMatchPercent)
+                        .ToList();
+                    }
+
+                    var temp2 = visualNovels
+                        .Where(vn => vn.VisualNovel.AnotherTitles != null && vn.VisualNovel.AnotherTitles.Any(t => Fuzz.WeightedRatio(t.ToLower(), searchLowerCase) >= anotherMatchPercent))
+                        .ToList();
+
+                    visualNovels = temp1.Concat(temp2).ToList();
+
+                    visualNovels = visualNovels.Distinct().ToList();
+                }
 
                 switch (sort)
                 {

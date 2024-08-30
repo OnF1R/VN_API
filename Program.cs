@@ -98,8 +98,8 @@ namespace VN_API
             builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
             builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
 
-            //var connectionString = "Server=localhost;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;";
-            var connectionString = "Server=91.107.126.70;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;";
+            var connectionString = "Server=localhost;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;";
+            //var connectionString = "Server=91.107.126.70;Port=5432;User Id=postgres;Password=moloko990;Database=vndb;";
             //var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'VndbConnection' not found.");
 
             if (connectionString == null)
