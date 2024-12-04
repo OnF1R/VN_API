@@ -28,6 +28,7 @@ namespace VN_API
             builder.Services.AddTransient<ICommentService, CommentService>();
             builder.Services.AddTransient<ICommentRatingService, CommentRatingService>();
             builder.Services.AddTransient<IVNDBQueriesService, VNDBQueriesService>();
+            builder.Services.AddTransient<IVisualNovelRecommendationService, VisualNovelRecommendationService>();
 
             builder.Services.AddMemoryCache();
 

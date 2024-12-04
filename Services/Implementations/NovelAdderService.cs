@@ -414,23 +414,23 @@ namespace VN_API.Services
 
                     string searchLowerCase = search.ToLower();
 
-                    foreach (var vn in visualNovels)
-                    {
-                        var rate = Fuzz.PartialRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase);
-                        Console.WriteLine($"{vn.VisualNovel.Title}: Match {rate}/{partialRatioPercent}");
-                    }
+                    //foreach (var vn in visualNovels)
+                    //{
+                    //    var rate = Fuzz.PartialRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase);
+                    //    Console.WriteLine($"{vn.VisualNovel.Title}: Match {rate}/{partialRatioPercent}");
+                    //}
 
-                    foreach (var vn in visualNovels)
-                    {
-                        if (vn.VisualNovel.AnotherTitles != null)
-                        {
-                            foreach (var title in vn.VisualNovel.AnotherTitles)
-                            {
-                                var rate = Fuzz.WeightedRatio(title.ToLower(), searchLowerCase);
-                                Console.WriteLine($"{title}: Match {rate}/{anotherMatchPercent}");
-                            }
-                        }
-                    }
+                    //foreach (var vn in visualNovels)
+                    //{
+                    //    if (vn.VisualNovel.AnotherTitles != null)
+                    //    {
+                    //        foreach (var title in vn.VisualNovel.AnotherTitles)
+                    //        {
+                    //            var rate = Fuzz.WeightedRatio(title.ToLower(), searchLowerCase);
+                    //            Console.WriteLine($"{title}: Match {rate}/{anotherMatchPercent}");
+                    //        }
+                    //    }
+                    //}
 
                     var temp1 = visualNovels
                         .Where(vn => Fuzz.PartialRatio(vn.VisualNovel.Title.ToLower(), searchLowerCase) >= partialRatioPercent)
